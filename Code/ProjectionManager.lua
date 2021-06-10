@@ -1,7 +1,6 @@
 --[[
 This is the heart of the entire program... it's not well commented but here if you really want to take a look.
 ]]
-
 function Projector(core, camera)
     
     -- Localize frequently accessed data
@@ -25,10 +24,10 @@ function Projector(core, camera)
     local print = system.print
     
     --- Core-based function calls
-    local getConstructWorldPos = core.getConstructWorldPos
-    local getConstructWorldOrientationRight = core.getConstructWorldOrientationRight
-    local getConstructWorldOrientationForward = core.getConstructWorldOrientationForward
-    local getConstructWorldOrientationUp = core.getConstructWorldOrientationUp
+    local getCWorldPos = core.getConstructWorldPos
+    local getCWorldOriR = core.getConstructWorldOrientationRight
+    local getCWorldOriF = core.getConstructWorldOrientationForward
+    local getCWorldOriU = core.getConstructWorldOrientationUp
     local getElementPositionById = core.getElementPositionById
     local getElementRotationById = core.getElementRotationById
     
@@ -46,6 +45,7 @@ function Projector(core, camera)
     local getPlayerLocalPos = manager.getPlayerLocalPos
     ---- Quaternion operations
     local rotToQuat = manager.rotationMatrixToQuaternion
+    local rotToEuler = manager.rotationMatrixToEuler
     local inverse = manager.inverse
     local multiply = manager.multiply
     local divide = manager.divide
@@ -73,38 +73,18 @@ function Projector(core, camera)
     local left = bottom * aspect
     local right = top * aspect
 
-    local near = width/tanFov
-    local far = 10000
-    local aspect = width/height
-
     --- Matrix Paramters
     local x0 = 2 * near / (right - left)
     local y0 = 2 * near / (top - bottom)
-    local a0 = (right + left) / (right - left)
-    local b0 = (top + bottom) / (top - bottom)
-    local c0 = -(far + near) / (far - near)
-    local d0 = -2 * far * near / (far - near)
-
-
-    --- What the projection matrix actually looks like.
-    ---- a0 is usually 0
-    ---- b0 is usually 0
-    local projectionMatrix = {
-        x0, 0, a0,  0,
-        0, y0, b0,  0,
-        0,  0, c0, d0,
-        0,  0, -1,  0
-    }
 
     -- Player-related values
     local playerId = unit.getMasterPlayerId()
     local unitId = unit.getId()
-    local eye = camera.position
     
     -- Camera-Related values
-    local camera = camera
+    local eye = camera.position
     local cOrientation = camera.orientation
-    local cameraType = camera.type
+    local cameraType = camera.cType
     local alignmentType = nil
     
     --- Mouse info
@@ -117,42 +97,21 @@ function Projector(core, camera)
 
     local self = {}
     local objects = {}
-    
-    function self.updateProjectionMatrix()
-        --- Screen Parameters
-        width = getWidth()/2
-        height = getHeight()/2
 
-        --- FOV Paramters
-        hfovRad = rad(getFov());
-        fov = 2*atan(tan(hfovRad/2)*height,width)
-
-        --- Matrix Subprocessing
-        tanFov = tan(fov/2)
-        aspect = width/height
-        near = width/tanFov
-        top = near * tanFov
-        bottom = -top;
-        left = bottom * aspect
-        right = top * aspect
-
-        near = width/tanFov
-        far = 10000
-        aspect = width/height
-
-        --- Matrix Paramters
-        x0 = 2 * near / (right - left)
-        y0 = 2 * near / (top - bottom)
-        a0 = (right + left) / (right - left)
-        b0 = (top + bottom) / (top - bottom)
-        c0 = -(far + near) / (far - near)
-        d0 = -2 * far * near / (far - near)
-    
-        m = sensitivity*(width*2)*0.00104584100642898 + 0.00222458611638299
+    function self.getSize(size, zDepth, max, min)
+        local pSize = atan(size, zDepth) * (near / aspect)
+        local max = max or pSize
+        if pSize >= max then
+            return max
+        elseif pSize <= min then
+            return min
+        else
+            return pSize
+        end
     end
-
+    
     function self.updateCamera()
-        if cameraType == "player" then
+        if cameraType.name ~= "fGlobal" and cameraType.name ~= "fLocal" then
             
             -- Localize variables
             local atan = atan
@@ -230,7 +189,8 @@ function Projector(core, camera)
             end
         end
     end
-	function self.addObject(object)
+
+    function self.addObject(object)
         local index = #objects + 1
         objects[index] = object
         return index
@@ -242,72 +202,67 @@ function Projector(core, camera)
     
     function self.getModelMatrices(mObject)
         
-        local sin = sin
-        local cos = cos
-        local multiply = multiply
+        local s = sin
+        local c = cos
+        local multi = multiply
         local inverse = inverse
         local modelMatrices = {}
         
         -- Localize Object values.
         local obj = mObject
-        local objOrientationType = obj.orientationType
-        local objOrientation = obj.orientation
+        local objOriType = obj.orientationType
+        local objOri = obj.orientation
         local objPosType = obj.positionType
         local objPos = obj.position
         local objPosX,objPosY,objPosZ = objPos[1],objPos[2],objPos[3]
         
-        local cUpDir = getConstructWorldOrientationUp()
-        local cUpDirX,cUpDirY,cUpDirZ = cUpDir[1],cUpDir[2],cUpDir[3]
-        local cForwd = getConstructWorldOrientationForward()
-        local cForwdX,cForwdY,cForwdZ = cForwd[1],cForwd[2],cForwd[3]
-        local cRight = getConstructWorldOrientationRight()
-        local cRightX,cRightY,cRightZ = cRight[1],cRight[2],cRight[3]
+        local cU = getCWorldOriU()
+        local cUX,cUY,cUZ = cU[1],cU[2],cU[3]
+        local cF = getCWorldOriF()
+        local cFX,cFY,cFZ = cF[1],cF[2],cF[3]
+        local cR = getCWorldOriR()
+        local cRX,cRY,cRZ = cR[1],cR[2],cR[3]
         
-        local sx, sy, sz, sw = rotToQuat({
-                    cRightX,cRightY,cRightZ,0,
-                    cForwdX,cForwdY,cForwdZ,0,
-                    cUpDirX,cUpDirY,cUpDirZ,0,
-                    0,0,0,1
-                })
+        local sx,sy,sz,sw = rotToQuat({cRX,cRY,cRZ,0,cFX,cFY,cFZ,0,cUX,cUY,cUZ,0,0,0,0,1})
         
         local recurse = {}
-        local c = 2
+        local ct = 2
         function recurse.subObjectMatrices(lx, ly, lz, lw, sObjX, sObjY, sObjZ, object, posLX, posLY, posLZ)
-            local posLX, posLY, posLZ = posLX, posLY, posLZ
-            local sObjX, sObjY, sObjZ = sObjX, sObjY, sObjZ
-            local object = object
             local objPos = object.position
             local objRot = object.orientation
             local objRotType = object.orientationType
             local objX,objY,objZ = objPos[1],objPos[2],objPos[3]
             
-            
             local objP,objH,objR = objRot[1] / 2,objRot[2] / 2,objRot[3] / 2
-            local sinP,sinH,sinR = sin(objP),sin(objR),sin(objH)
-            local cosP,cosH,cosR = cos(objP),cos(objR),cos(objH)
+            local sP,sH,sR = s(objP),s(objR),s(objH)
+            local cP,cH,cR = c(objP),c(objR),c(objH)
     
-            local wwx = (sinP * cosH * cosR - cosP * sinH * sinR)
-            local wwy = (cosP * sinH * cosR + sinP * cosH * sinR)
-            local wwz = (cosP * cosH * sinR - sinP * sinH * cosR)
-            local www = (cosP * cosH * cosR + sinP * sinH * sinR)
-            local wx, wy, wz, ww = wwx, wwy, wwz, www
-            
-            
+            local wwx = (sinP * cosH*cosR - cosP * sinH * sinR)
+            local wwy = (cosP * sinH*cosR + sinP * cosH * sinR)
+            local wwz = (cosP * cosH* sinR - sinP * sinH * cosR)
+            local www = (cosP * cosH* cosR + sinP * sinH * sinR)
+            local wx, wy, wz, ww = wwx,wwy,wwz,www
+
             local lix, liy, liz, liw = inverse(lx, ly, lz, lw)
-            local posTX, posTY, posTZ, posTW = multiply(lx, ly, lz, lw, objX - sObjX, objY - sObjY, objZ - sObjZ, 0)
-            local posIX, posIY, posIZ, posIW = multiply(posTX, posTY, posTZ, posTW, lix, liy, liz, liw)
-            posIX, posIY, posIZ, posIW = -posIX, posIY, posIZ, posIW
+            
+            local posTX, posTY, posTZ, posTW = multi(lx, ly, lz, lw, objX, objY, objZ, 0)
+
+            local posIX = -posTX*liw + posTW*lix - posTY*liz - posTZ*liy
+            local posIY = posTY*liw + posTW*liy + posTZ*lix - posTX*liz
+            local posIZ = -posTZ*liw + posTW*liz + posTX*liy + posTY*lix
+
             if object.positionType == "local" then
-                local dotX = cRightX*posIX + cForwdX*posIY + cUpDirX*posIZ
-                local dotY = cRightY*posIX + cForwdY*posIY + cUpDirY*posIZ
-                local dotZ = cRightZ*posIX + cForwdZ*posIY + cUpDirZ*posIZ
+                local dotX = cRX*posIX + cFX*posIY + cUX*posIZ
+                local dotY = cRY*posIX + cFY*posIY + cUY*posIZ
+                local dotZ = cRZ*posIX + cFZ*posIY + cUZ*posIZ
                 posIX = dotX
                 posIY = dotY
                 posIZ = dotZ
             end
             posIX, posIY, posIZ = posIX + posLX, posIY + posLY, posIZ + posLZ
+            
             if objRotType == "local" then
-                wx, wy, wz, ww = multiply(wx, wy, wz, ww, sx, sy, sz, sw)
+                wx, wy, wz, ww = multi(wx, wy, wz, ww, sx, sy, sz, sw)
             end
             local wxwx,wxwy,wxwz,wxww = wx*wx,wx*wy,wx*wz,wx*ww
             local wywy,wywz,wyww = wy*wy,wy*wz,wy*ww
@@ -324,7 +279,7 @@ function Projector(core, camera)
             local h1 = 2*(wywz + wxww)
             local i1 = 1 - 2*(wxwx + wywy)
             
-            modelMatrices[c] = {
+            modelMatrices[ct] = {
                 object,
                 {
                     a1, -d1, -g1, posIX,
@@ -334,7 +289,7 @@ function Projector(core, camera)
                 }
 
             }
-            c = c + 1
+            ct=ct+1
             
             local subObjects = object.subObjects
             if #subObjects > 0 then
@@ -343,27 +298,24 @@ function Projector(core, camera)
                 end
             end
         end
-        local pitch,heading,roll = objOrientation[1] / 2,objOrientation[2] / 2,objOrientation[3] / 2
+        local pitch,heading,roll = objOri[1] / 2,objOri[2] / 2,objOri[3] / 2
         
         --- Quaternion of object rotations
-        local sinP,sinH,sinR = sin(pitch),sin(roll),sin(heading)
-        local cosP,cosH,cosR = cos(pitch),cos(roll),cos(heading)
+        local sP,sH,sR = s(pitch),s(roll),s(heading)
+        local cP,cH,cR = c(pitch),c(roll),c(heading)
     
-        local wwx = -(sinP * cosH * cosR - cosP * sinH * sinR)
-        local wwy = -(cosP * sinH * cosR + sinP * cosH * sinR)
-        local wwz = -(cosP * cosH * sinR - sinP * sinH * cosR)
-        local www = -(cosP * cosH * cosR + sinP * sinH * sinR)
-        local wx, wy, wz, ww = wwx, wwy, wwz, www
+        local wwx = (sP*cH*cR - cP*sH*sR)
+        local wwy = (cP*sH*cR + sP*cH*sR)
+        local wwz = (cP*cH*sR - sP*sH*cR)
+        local www = (cP*cH*cR + sP*sH*sR)
+        local wx,wy,wz,ww = wwx,wwy,wwz,www
         
-        
-        if objOrientationType == "local" then
-            wx, wy, wz, ww = multiply(wx, wy, wz, ww, sx, sy, sz, sw)
+        if objOriType == "local" then
+            wx,wy,wz,ww = multiply(wx,wy,wz,ww,sx,sy,sz,sw)
         end
         
         local wxwx,wxwy,wxwz,wxww = wx*wx,wx*wy,wx*wz,wx*ww
-        
         local wywy,wywz,wyww = wy*wy,wy*wz,wy*ww
-        
         local wzwz,wzww = wz*wz,wz*ww
         
         local a2 = 1 - 2*(wywy + wzwz)
@@ -379,9 +331,9 @@ function Projector(core, camera)
         local i2 = 1 - 2*(wxwx + wywy)
 
         if objPosType == "local" then
-            local dotX = cRightX*objPosX + cForwdX*objPosY + cUpDirX*objPosZ
-            local dotY = cRightY*objPosX + cForwdY*objPosY + cUpDirY*objPosZ
-            local dotZ = cRightZ*objPosX + cForwdZ*objPosY + cUpDirZ*objPosZ
+            local dotX = cRX*objPosX + cFX*objPosY + cUX*objPosZ
+            local dotY = cRY*objPosX + cFY*objPosY + cUY*objPosZ
+            local dotZ = cRZ*objPosX + cFZ*objPosY + cUZ*objPosZ
             objPosX = dotX
             objPosY = dotY
             objPosZ = dotZ
@@ -391,26 +343,19 @@ function Projector(core, camera)
             objPosY = objPosY - cWorldPos[2]
             objPosZ = objPosZ - cWorldPos[3]
         end
-        local subObjects = obj.subObjects
-        if #subObjects > 0 then
-            for k = 1, #subObjects do
-                recurse.subObjectMatrices(wwx, wwy, wwz, www,objPos[1], objPos[2], objPos[3], subObjects[k], objPosX, objPosY, objPosZ)
+        local subObjs = obj.subObjects
+        if #subObjs > 0 then
+            for k = 1, #subObjs do
+                recurse.subObjectMatrices(wwx,wwy,wwz,www,objPos[1],objPos[2],objPos[3],subObjs[k],objPosX,objPosY,objPosZ)
             end
         end
-        modelMatrices[1] = {
-            obj,
-            {
-                a2, -d2, -g2, objPosX,
-                -b2, e2, h2, -objPosY,
-                -c2, f2, i2, -objPosZ,
-                0, 0, 0, 1
-            }
-        }
+        modelMatrices[1] = {obj,{a2, -d2, -g2, objPosX,-b2, e2, h2, -objPosY,-c2, f2, i2, -objPosZ,0, 0, 0, 1}}
         return modelMatrices
     end
 
     function self.getViewMatrix()
-        local multiply = multiply
+        local multi = multiply
+        local solve = solve
         
         local board = getElementRotationById(unitId)
         local ax,ay,az,aw = board[1],board[2],board[3],board[4]
@@ -418,89 +363,88 @@ function Projector(core, camera)
         local body = getRelativeOrientation()
         local bx,by,bz,bw = body[1],body[2],body[3],body[4]
 
-        local vc1 = getConstructWorldOrientationRight()
-        local vc2 = getConstructWorldOrientationForward()
-        local vc3 = getConstructWorldOrientationUp()
-        local vc1t = solve(vc1, vc2, vc3, {1,0,0})
-        local vc2t = solve(vc1, vc2, vc3, {0,1,0})
-        local vc3t = solve(vc1, vc2, vc3, {0,0,1})
+        local v1 = getCWorldOriR()
+        local v2 = getCWorldOriF()
+        local v3 = getCWorldOriU()
+        local v1t = solve(v1,v2,v3,{1,0,0})
+        local v2t = solve(v1,v2,v3,{0,1,0})
+        local v3t = solve(v1,v2,v3,{0,0,1})
         
-        local sx, sy, sz, sw = rotToQuat({
-        vc1t[1],vc1t[2],vc1t[3],0,
-        vc2t[1],vc2t[2],vc2t[3],0,
-        vc3t[1],vc3t[2],vc3t[3],0,
-        0,0,0,1})
+        local sx, sy, sz, sw = rotToQuat({v1t[1],v1t[2],v1t[3],0,v2t[1],v2t[2],v2t[3],0,v3t[1],v3t[2],v3t[3],0,0,0,0,1})
+        local lx, ly, lz, lw = rotToQuat({v1[1],v1[2],v1[3],0,v2[1],v2[2],v2[3],0,v3[1],v3[2],v3[3],0,0,0,0,1})
 
         local eye = eye
         local eyeX,eyeY,eyeZ = eye[1],eye[2],eye[3]
         local dotX, dotY, dotZ = eyeX, eyeY, eyeZ
         local wx, wy, wz, ww = 0,0,0,1
-        local sin = sin
-        local cos = cos
+        local s = sin
+        local c = cos
         
-        local px, py, pz, pw = multiply(ax, ay, az, aw, bx, by, bz, bw)
+        local px, py, pz, pw = multi(ax, ay, az, aw, bx, by, bz, bw)
         local alignment = getAlignmentType(px, py, pz, pw, eyeX, eyeY, eyeZ)
         alignmentType = alignment
         local pix, piy, piz, piw = inverse(px, py, pz, pw)
         local shift = alignment.shift
             
-        local eyeTX, eyeTY, eyeTZ, eyeTW = multiply(px, py, pz, pw, shift[1], shift[2], shift[3], 0)
-        local eyeIX, eyeIY, eyeIZ, eyeIW = multiply(eyeTX, eyeTY, eyeTZ, eyeTW, pix, piy, piz, piw)
+        local eyeTX, eyeTY, eyeTZ, eyeTW = multi(px, py, pz, pw, shift[1], shift[2], shift[3], 0)
+        local eyeIX, eyeIY, eyeIZ, eyeIW = multi(eyeTX, eyeTY, eyeTZ, eyeTW, pix, piy, piz, piw)
         
-        local alignmentName = alignment.name
-        local orientation = cOrientation
-        local pitch,roll,heading = orientation[1] / 2,0,orientation[2] / 2,0
-        if pitch ~= 0 or heading ~= 0 or roll ~= 0 or alignmentName == "fixed" then
-            local sinP,sinH,sinR = sin(pitch),sin(roll),sin(heading)
-            local cosP,cosH,cosR = cos(pitch),cos(roll),cos(heading)
+        local alignName = alignment.name
+        local nFG=alignName~="fGlobal"
+        local fG=alignName=="fGlobal"
+        local nFL=alignName~="fLocal"
+        local fL=alignName=="fLocal"
+        local ori = cOrientation
+        local pitch,roll,heading = ori[1] / 2,0,ori[2] / 2,0
+        if pitch ~= 0 or heading ~= 0 or roll ~= 0 or fG or fL then
+            local sP,sH,sR = s(pitch),s(roll),s(heading)
+            local cP,cH,cR = c(pitch),c(roll),c(heading)
             
-            local cx = (sinP * cosH * cosR - cosP * sinH * sinR)
-            local cy = -(cosP * sinH * cosR + sinP * cosH * sinR)
-            local cz = -(cosP * cosH * sinR - sinP * sinH * cosR)
-            local cw = (cosP * cosH * cosR + sinP * sinH * sinR)
-            if alignmentName ~= "fixed" then
-                px, py, pz, pw = multiply(px, py, pz, pw, cx, cy, cz, cw)
+            local cx = sP*cH*cR - cP*sH*sR
+            local cy = -cP*sH*cR - sP*cH*sR
+            local cz = -cP*cH*sR + sP*sH*cR
+            local cw = cP*cH*cR + sP*sH*sR
+            if nFG and nFL then
+                px,py,pz,pw = multi(px,py,pz,pw,cx,cy,cz,cw)
+
+            elseif alignName == "fGlobal" then
+                wx,wy,wz,ww = cx,cy,cz,cw
             else
-                wx, wy, wz, ww = cx, cy, cz, cw
+                wx,wy,wz,ww = multi(sx,sy,sz,sw,cx,cy,cz,cw)
             end
         end
         
-        if alignmentName ~= "fixed" then
-        
-            local a1 = 1 - 2*(py*py + pz*pz)
-            local b1 = 2*(px*py - pz*pw)
-            local c1 = 2*(px*pz + py*pw)
+        if nFG and nFL then
+            local pxpx,pxpy,pxpz,pxpw = px*px,px*py,px*pz,px*pw
+            local pypy,pypz,pypw = py*py,py*pz,py*pw
+            local pzpz,pzpw = pz*pz,pz*pw
+            
+            local a1 = 1 - 2*(pypy + pzpz)
+            local b1 = 2*(pxpy - pzpw)
+            local c1 = 2*(pxpz + pypw)
     
-            local d1 = 2*(px*py + pz*pw)
-            local e1 = 1 - 2*(px*px + pz*pz)
-            local f1 = 2*(py*pz - px*pw)
+            local d1 = 2*(pxpy + pzpw)
+            local e1 = 1 - 2*(pxpx + pzpz)
+            local f1 = 2*(pypz - pxpw)
     
-            local g1 = 2*(px*pz - py*pw)
-            local h1 = 2*(py*pz + px*pw)
-            local i1 = 1 - 2*(px*px + py*py)
+            local g1 = 2*(pxpz - pypw)
+            local h1 = 2*(pypz + pxpw)
+            local i1 = 1 - 2*(pxpx + pypy)
             eyeX = eyeX - eyeIX
             eyeY = eyeY + eyeIY
             eyeZ = eyeZ + eyeIZ
         
-            dotX = a1*eyeX + (-d1)*eyeY + (-g1)*eyeZ
-            dotY = (-b1)*eyeX + e1*eyeY + (h1)*eyeZ
-            dotZ = (-c1)*eyeX + (f1)*eyeY + i1*eyeZ
-            wx, wy, wz, ww = multiply(sx, sy, sz, sw, px, py, pz, pw)
+            dotX = a1*eyeX + -d1*eyeY + -g1*eyeZ
+            dotY = -b1*eyeX + e1*eyeY + h1*eyeZ
+            dotZ = -c1*eyeX + f1*eyeY + i1*eyeZ
+            wx,wy,wz,ww = multi(sx,sy,sz,sw,px,py,pz,pw)
         end
         -- Camera rotation determination
         --- Directly input euler angles in radians
         
-        local wxwx = wx*wx
-        local wxwy = wx*wy
-        local wxwz = wx*wz
-        local wxww = wx*ww
-        
-        local wywy = wy*wy
-        local wywz = wy*wz
-        local wyww = wy*ww
-        
-        local wzwz = wz*wz
-        local wzww = wz*ww
+        local wxwx,wxwy,wxwz,wxww = wx*wx,wx*wy,wx*wz,wx*ww
+        local wywy,wywz,wyww = wy*wy,wy*wz,wy*ww
+        local wzwz,wzww = wz*wz,wz*ww
         
         --- Matrix of camera rotations, using quaternions
         local a2 = 1 - 2*(wywy + wzwz)
@@ -515,34 +459,23 @@ function Projector(core, camera)
         local h2 = 2*(wywz + wxww)
         local i2 = 1 - 2*(wxwx + wywy)
 
-        return { -- View Matrix
-                a2, -d2, -g2, dotX,
-                -b2, e2, h2, dotY,
-                -c2, f2, i2, dotZ,
-                0, 0, 0, 1}
-    
+        return {a2, -d2, -g2, dotX,-b2, e2, h2, dotY,-c2, f2, i2, dotZ,0, 0, 0, 1}
     end
-	    
+    
     function self.getSVG()
-        local svg = {  }
+        local svg = {}
         local c = 1
-
         local view = self.getViewMatrix()
 
         local vx1,vy1,vz1,vw1 = view[1],view[2],view[3],view[4]
         local vx2,vy2,vz2,vw2 = view[5],view[6],view[7],view[8]
         local vx3,vy3,vz3,vw3 = view[9],view[10],view[11],view[12]
-
-        local masterXX,masterXY,masterXZ,masterXW = 0,0,0,0
-        local masterYX,masterYY,masterYZ,masterYW = 0,0,0,0
-        local masterZX,masterZY,masterZZ,masterZW = 0,0,0,0
         
-        local function translate(x, y, z)
-            local x,y,z = x,y,z
-
-            local px = masterXX * x + masterXY * y + masterXZ * z + masterXW
-            local py = masterYX * x + masterYY * y + masterYZ * z + masterYW
-            local pz = masterZX * x + masterZY * y + masterZZ * z + masterZW
+        local function translate(x,y,z,mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+            local x,y,z = x,-y,-z
+            local px = mXX * x + mXY * y + mXZ * z + mXW
+            local py = mYX * x + mYY * y + mYZ * z + mYW
+            local pz = mZX * x + mZY * y + mZZ * z + mZW
             local pw = -py
                 
             -- Convert to window coordinates after W-Divide
@@ -550,7 +483,6 @@ function Projector(core, camera)
             local wy = (pz / pw) * height
             return wx, wy, pw
         end
-        
         -- Localize projection matrix values
         local px1 = x0
         local py2 = 1 --c0
@@ -563,18 +495,21 @@ function Projector(core, camera)
         for i = 1, #objects do
             
             local object = objects[i]
+            local objTransX = object.transX or width
+            local objTransY = object.transY or height
+            
             svg[c] = [[<svg viewBox="0 0 ]]
-            svg[c + 1] = width*2
-            svg[c + 2] = [[ ]]
-            svg[c + 3] = height*2
-            svg[c + 4] = [[" class="]]
-            svg[c + 5] = object.style
-            svg[c + 6] = '"><g transform="translate('
-            svg[c + 7] = width
-            svg[c + 8] = ','
-            svg[c + 9] = height
-            svg[c + 10] = ')">'
-            c = c + 11
+            svg[c+1] = width*2
+            svg[c+2] = [[ ]]
+            svg[c+3] = height*2
+            svg[c+4] = [[" class="]]
+            svg[c+5] = object.style
+            svg[c+6] = '"><g transform="translate('
+            svg[c+7] = objTransX
+            svg[c+8] = ','
+            svg[c+9] = objTransY
+            svg[c+10] = ')">'
+            c=c+11
             local models = self.getModelMatrices(object)
             
             -- Localize model matrix values
@@ -586,98 +521,96 @@ function Projector(core, camera)
                 local mx1,my1,mz1,mw1 = model[1],model[2],model[3],model[4]
                 local mx2,my2,mz2,mw2 = model[5],model[6],model[7],model[8]
                 local mx3,my3,mz3,mw3 = model[9],model[10],model[11],model[12]
-            
-                masterXX = px1*(vx1*mx1 + vy1*mx2 + vz1*mx3)
-                masterXY = px1*(vx1*my1 + vy1*my2 + vz1*my3)
-                masterXZ = px1*(vx1*mz1 + vy1*mz2 + vz1*mz3)
-                masterXW = px1*(vw1 + vx1*mw1 + vy1*mw2 + vz1*mw3)
+                
+                local mXX = px1*(vx1*mx1 + vy1*mx2 + vz1*mx3)
+                local mXY = px1*(vx1*my1 + vy1*my2 + vz1*my3)
+                local mXZ = px1*(vx1*mz1 + vy1*mz2 + vz1*mz3)
+                local mXW = px1*(vw1 + vx1*mw1 + vy1*mw2 + vz1*mw3)
         
-                masterYX = (vx2*mx1 + vy2*mx2 + vz2*mx3)
-                masterYY = (vx2*my1 + vy2*my2 + vz2*my3)
-                masterYZ = (vx2*mz1 + vy2*mz2 + vz2*mz3)
-                masterYW = (vw2 + vx2*mw1 + vy2*mw2 + vz2*mw3)
+                local mYX = (vx2*mx1 + vy2*mx2 + vz2*mx3)
+                local mYY = (vx2*my1 + vy2*my2 + vz2*my3)
+                local mYZ = (vx2*mz1 + vy2*mz2 + vz2*mz3)
+                local mYW = (vw2 + vx2*mw1 + vy2*mw2 + vz2*mw3)
         
-                masterZX = pz3*(vx3*mx1 + vy3*mx2 + vz3*mx3)
-                masterZY = pz3*(vx3*my1 + vy3*my2 + vz3*my3)
-                masterZZ = pz3*(vx3*mz1 + vy3*mz2 + vz3*mz3)
-                masterZW = pz3*(vw3 + vx3*mw1 + vy3*mw2 + vz3*mw3)
-
+                local mZX = pz3*(vx3*mx1 + vy3*mx2 + vz3*mx3)
+                local mZY = pz3*(vx3*my1 + vy3*my2 + vz3*my3)
+                local mZZ = pz3*(vx3*mz1 + vy3*mz2 + vz3*mz3)
+                local mZW = pz3*(vw3 + vx3*mw1 + vy3*mw2 + vz3*mw3)
+                
                 local polylineGroups = object.polylineGroups
                 local circleGroups = object.circleGroups
                 local curvesGroups = object.curvesGroups
                 local customGroups = object.customGroups
             
                 -- Polylines for-loop
-                for d = 1, #polylineGroups do
+                for d=1,#polylineGroups do
                     local polylineGroup = polylineGroups[d]
                     svg[c] = '<path class="'
-                    svg[c + 1] = polylineGroup[1]
-                    svg[c + 2] = '" d="'
-                    c = c + 3
-                    for f = 2, #polylineGroup do
+                    svg[c+1] = polylineGroup[1]
+                    svg[c+2] = '" d="'
+                    c = c+3
+                    for f=2,#polylineGroup do
                         local line = polylineGroup[f]
                         svg[c] = 'M '
-                        local lineCount = 0
-                        local startPoint = {}
-                        local endPoint = {}
-                        c = c + 1
+                        local lC=0
+                        local sP={}
+                        local eP={}
+                        c=c+1
                         for h = 1, #line do
-                            local point = line[h]
-                            local wx, wy, ww = translate(point[1],point[2],point[3])
+                            local p = line[h]
+                            local wx,wy,ww = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
 
                             -- If PW is negative, it means the point is behind you
                             if ww > 0 then
-                                if lineCount ~= 0 then
+                                if lC ~= 0 then
                                     svg[c] = ' L '
                                     c = c + 1
-                                    endPoint = {wx, wy}
+                                    eP = {wx, wy}
                                 else
-                                    startPoint = {wx, wy}
+                                    sP = {wx, wy}
                                 end
                                 svg[c] = wx
-                                svg[c + 1] = ' '
-                                svg[c + 2] = wy
-                                c = c + 3
-                                lineCount = lineCount + 1
+                                svg[c+1] = ' '
+                                svg[c+2] = wy
+                                c=c+3
+                                lC=lC+1
                             end
                         end
-                        if lineCount < 2 then
-                            if lineCount == 1 then
-                                svg[c - 4] = ''
-                                svg[c - 3] = ''
-                                svg[c - 2] = ''
-                                svg[c - 1] = ''
-                                c = c - 4
+                        if lC < 2 then
+                            if lC == 1 then
+                                svg[c-4] = ''
+                                svg[c-3] = ''
+                                svg[c-2] = ''
+                                svg[c-1] = ''
+                                c=c-4
                             else
-                                svg[c - 1] = ''
-                                c = c - 1
+                                svg[c-1] = ''
+                                c=c-1
                             end
                         else
-                            if endPoint[1] == startPoint[1] and endPoint[2] == startPoint[2] then
-                                svg[c - 4] = ' Z '
-                                svg[c - 3] = ''
-                                svg[c - 2] = ''
-                                svg[c - 1] = ''
-                                c = c - 3
+                            if eP[1] == sP[1] and eP[2] == sP[2] then
+                                svg[c-4] = ' Z '
+                                svg[c-3] = ''
+                                svg[c-2] = ''
+                                svg[c-1] = ''
+                                c=c-3
                             end
                         end
                     end
                     svg[c] = '"/>'
-                    c = c + 1
+                    c=c+1
                 end
-                for cG = 1, #circleGroups do
+                for cG=1,#circleGroups do
                     local circleGroup = circleGroups[cG]
                     svg[c] = '<g class="'
-                    svg[c + 1] = circleGroup[1]
-                    svg[c + 2] = '">'
-                    c = c + 3
-                    for l = 2, #circleGroup do
+                    svg[c+1] = circleGroup[1]
+                    svg[c+2] = '">'
+                    c=c+3
+                    for l=2, #circleGroup do
                         local circle = circleGroup[l]
-                        local point = circle[1]
-            
-                        local wx, wy, wz = translate(point[1],point[2],point[3])
-
-                        -- If PW is negative, it means the point is behind you
+                        local p = circle[1]
+                        
+                        local wx, wy, wz = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
                         if wz > 0 then
                             local radius = circle[2]
                             local fill = circle[3]
@@ -692,7 +625,7 @@ function Projector(core, camera)
                             svg[c+6] = '" fill="'
                             svg[c+7] = fill
                             svg[c+8] = '"/>'
-                            c = c + 9
+                            c = c+9
                             if label ~= nil then
                                 svg[c] = '<text x="'
                                 svg[c+1] = wx
@@ -701,61 +634,61 @@ function Projector(core, camera)
                                 svg[c+4] = '">'
                                 svg[c+5] = label
                                 svg[c+6] = '</text>'
-                                c = c + 7
+                                c=c+7
                             end
                             if action ~= nil then
-                                svg, c = action(svg, c, object, wx, wy, wz)
+                                c = action(svg, c, object, wx, wy, wz)
                             end
                         end
                     end
                     svg[c] = '</g>'
-                    c = c + 1
+                    c=c+1
                 end
                 for cG = 1, #customGroups do
                     local customGroup = customGroups[cG]
                     local multiGroups = customGroup[2]
                     local singleGroups = customGroup[3]
                     svg[c] = '<g class="'
-                    svg[c + 1] = customGroup[1]
-                    svg[c + 2] = '">'
-                    c = c + 3
+                    svg[c+1] = customGroup[1]
+                    svg[c+2] = '">'
+                    c = c+3
                     for mGC = 1, #multiGroups do
                         local multiGroup = multiGroups[mGC]
-                        local points = multiGroup[1]
+                        local pts = multiGroup[1]
                         local tPoints = {}
-                        local count = 1
-                        for pCount = 1, #points do
-                            local point = points[pCount]
-                            local tx, ty, tz = translate(point[1],point[2],point[3])
+                        local ct = 1
+                        for pC = 1, #pts do
+                            local p = pts[pC]
+                            local tx,ty,tz = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
                             if tz > 0 then
-                                tPoints[count] = {tx, ty, tz}
-                                count = count + 1
+                                tPoints[ct] = {tx,ty,tz}
+                                ct = ct + 1
                             end
                         end
-                        if count ~= 1 then
+                        if ct ~= 1 then
                             local drawFunction = multiGroup[2]
                             local data = multiGroup[3]
-                            svg, c = drawFunction(svg, c, object, tPoints, data)
+                            c = drawFunction(svg, c, object, tPoints, data)
                         end
                     end
                     for sGC = 1, #singleGroups do
                         local singleGroup = singleGroups[sGC]
-                        local point = singleGroup[1]
-                        local tx, ty, tz = translate(point[1],point[2],point[3])
+                        local p = singleGroup[1]
+                        local tx, ty, tz = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
                         if tz > 0 then
                             local drawFunction = singleGroup[2]
                             local data = singleGroup[3]
-                            svg, c = drawFunction(svg, c, object, tx, ty, tz, data)
+                            c = drawFunction(svg,c,object,tx,ty,tz,data)
                         end
                     end
                     svg[c] = '</g>'
-                    c = c + 1
+                    c=c+1
                 end
             end
             svg[c] = '</g></svg>'
-            c = c + 1
+            c = c+1
         end
-        return svg, (c)
+        return svg, c
     end
     return self
 end

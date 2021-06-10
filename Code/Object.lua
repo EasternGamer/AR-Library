@@ -6,9 +6,8 @@ orientationTypes = {
     globalO = "global",
     localO = "local" 
 }
--- There are some "to investigate" parts in this, particularly the offset values.
--- To investigate simply means to make sure all is working as intended.
-function Object(style, position, offset, orientation, positionType, orientationType)
+
+function Object(style, position, offset, orientation, positionType, orientationType, transX, transY)
     local rad = math.rad
     local print = system.print
     
@@ -37,7 +36,10 @@ function Object(style, position, offset, orientation, positionType, orientationT
         orientationType = orientationType,
         orientation = {pitch,heading,roll},
         style = style,
-        position = position
+        position = position,
+        offset = offset,
+        transX,
+        transY
     }
     
     function self.setPolylines(groupId, style, points, scale)
@@ -51,7 +53,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
             local newPoints = {}
             for k = 1, #line do
                 local point = line[k]
-                newPoints[k] = {(point[1]) / scale + offsetX, -(point[2] / scale - offsetY), -(point[3] / scale  - offsetZ)}
+                newPoints[k] = {(point[1]) / scale + offsetX, (point[2] / scale - offsetY), (point[3] / scale  - offsetZ)}
             end
             group[i] = newPoints
         end
@@ -72,8 +74,8 @@ function Object(style, position, offset, orientation, positionType, orientationT
             local self = {}
             local position = {
                 (position[1] - offsetX) / scale,
-                -(position[2] - offsetY) / scale, 
-                -(position[3] - offsetZ) / scale
+                (position[2] - offsetY) / scale, 
+                (position[3] - offsetZ) / scale
             }
             function self.setLabel(label)
                 local self = {}
@@ -101,7 +103,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
         return self
     end
 
-    function self.setCurves(group, points) -- Currently placeholder
+    function self.setCurves(group, points)
     end
 
     function self.setCustomSVGs(groupId, style, scale)
@@ -129,11 +131,15 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 local point = point
                 points[pC] = {
                     (point[1] + offsetX) / scale, 
-                    -(point[2] - offsetY) / scale, 
-                    -(point[3] - offsetZ) / scale
+                    (point[2] - offsetY) / scale, 
+                    (point[3] - offsetZ) / scale
                 }
                 pC = pC + 1
                 return self
+            end
+            -- ! This function applies no processing !
+            function self.bulkSetPoints(bulk)
+                points = bulk
             end
             function self.setData(dat)
                 data = dat
@@ -148,6 +154,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
                     if drawFunction ~= nil then
                         multiPoint[mC] = {points, drawFunction, data}
                         mC = mC + 1
+                        return points
                     else
                         print("WARNING! Malformed multi-point build operation, no draw function specified. Ignoring.")
                     end
@@ -165,8 +172,8 @@ function Object(style, position, offset, orientation, positionType, orientationT
             function self.setPosition(position)
                 point = {
                     (position[1] + offsetX) / scale, 
-                    -(position[2] - offsetY) / scale, 
-                    -(position[3] - offsetZ) / scale
+                    (position[2] - offsetY) / scale, 
+                    (position[3] - offsetZ) / scale
                 }
                 return self
             end
@@ -245,8 +252,15 @@ function ObjectBuilderLinear()
                         function self.setOrientationType(orientationType)
                             local self = {}
                             local orientationType = orientationType
+                            local transX = nil
+                            local transY = nil
+                            function self.setTranslation(translateX, translateY)
+                                transX = translateX
+                                transY = translateY
+                                return self
+                            end
                             function self.build()
-                                return Object(style, pos, offset, orientation, positionType, orientationType)
+                                return Object(style, pos, offset, orientation, positionType, orientationType, transX, transY)
                             end
                             return self
                         end

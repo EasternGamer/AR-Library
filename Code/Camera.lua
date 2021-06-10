@@ -6,15 +6,31 @@ The camera object object controls how you want the camera to behave.
  
  This goes in a library.start() method.
 ]]
+--[[
+There are two main types of cameras, "fixed" and "player". 
+The camera object object controls how you want the camera to behave.
+ - For a "fixed" camera, you can think of the position as "fixed" unless you change the parameters yourself.
+ - For a "player" camera, all rotations and positions are automatically handled and linked directly to your character
+]]--
 local rad = math.rad
 cameraTypes = {
     fixed = {
-        name = "fixed",
-        pitchPos = nil,
-        pitchNeg = nil,
-        headingPos = nil,
-        headingNeg = nil,
-        shift = {0.0, 0.0, 0.0}
+        fLocal = {
+            name = "fLocal",
+            pitchPos = nil,
+            pitchNeg = nil,
+            headingPos = nil,
+            headingNeg = nil,
+            shift = {0.0, 0.0, 0.0}
+        },
+        fGlobal = {
+            name = "fGlobal",
+            pitchPos = nil,
+            pitchNeg = nil,
+            headingPos = nil,
+            headingNeg = nil,
+            shift = {0.0, 0.0, 0.0}
+        }
     },
     player = {
         jetpack = {
@@ -43,14 +59,24 @@ cameraTypes = {
         },
         chair = {
             firstPerson = {
-                name = "chairfp",
-                pitchPos = rad(75),
-                pitchNeg = rad(-75),
-                headingPos = rad(95),
-                headingNeg = rad(-95),
-                shift = {-0.1, 0.0, 0.65}
+                mouseControlled = {
+                    name = "chairfp_mouse",
+                    pitchPos = nil,
+                    pitchNeg = nil,
+                    headingPos = nil,
+                    headingNeg = nil,
+                    shift = {-0.1, 0.0, 0.65}
+                },
+                freelook = {
+                    name = "chairfp_free",
+                    pitchPos = rad(75),
+                    pitchNeg = rad(-75),
+                    headingPos = rad(95),
+                    headingNeg = rad(-95),
+                    shift = {-0.1, 0.0, 0.65}
+                }
             },
-            secondPerson = { -- This is place holder
+            secondPerson = {
                 name = "chairsp",
                 pitchPos = 0,
                 pitchNeg = 0,
@@ -58,7 +84,7 @@ cameraTypes = {
                 headingNeg = 0,
                 shift = {0.0, 0.0, 0.0}
             },
-            thirdPerson = { -- This is place holder
+            thirdPerson = {
                 name = "chairtp",
                 pitchPos = rad(84),
                 pitchNeg = rad(-89),
@@ -117,17 +143,22 @@ end
 function Camera(camType, position, orientation)
     local core = core
     local system = system
+    local unit = unit
     local planetaryInfluence = unit.getClosestPlanetInfluence
+    
+    local isViewLocked = false
+    
     local print = system.print
     local chairs = getChairPositions()
     local types = cameraTypes
     local rad = math.rad
     local abs = math.abs
-    
+    local position = {-position[1], position[2], position[3]}
     local self = {
-        type = camType,
+        cType = camType,
         position = position, 
-        orientation = orientation,
+        orientation = {rad(orientation[1]), rad(orientation[2]), rad(orientation[3])},
+        isViewLocked = isViewLocked,
         cameraShift
     }
     
@@ -148,11 +179,22 @@ function Camera(camType, position, orientation)
         self.type = alignmentType
     end
     
+    function self.setPosition(pos)
+        self.position = {-pos[1], pos[2], pos[3]}
+    end
+    
+    function self.setViewLock(isViewLocked)
+        self.isViewLocked = isViewLocked
+    end
+    
     function self.getAlignmentType(ax, ay, az, aw, bodyX, bodyY, bodyZ)
         local playerType = types.player
         local alignmentType = playerType.construct
-        if self.type.name == "fixed" then
-            alignmentType = types.fixed
+        if self.cType.name == "fLocal" then
+            alignmentType = types.fixed.fLocal
+            return alignmentType
+        elseif self.cType.name == "fGlobal" then
+            alignmentType = types.fixed.fGlobal
             return alignmentType
         end
         if ax ~= nil then
@@ -177,7 +219,12 @@ function Camera(camType, position, orientation)
                 if difX < 0.4 and difY < 0.4 and difZ < 0.4 then
                     local switch = switched % 3
                     if switch == 0 then
-                        alignmentType = playerType.chair.firstPerson
+                        local fp = playerType.chair.firstPerson
+                        if self.isViewLocked then
+                            alignmentType = fp.mouseControlled
+                        else
+                            alignmentType = fp.freelook
+                        end
                         return alignmentType
                     elseif switch == 1 then
                         alignmentType = playerType.chair.thirdPerson
@@ -192,6 +239,5 @@ function Camera(camType, position, orientation)
         switched = 0
         return alignmentType
     end
-    
     return self
 end
