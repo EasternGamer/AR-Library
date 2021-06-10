@@ -77,25 +77,27 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 (position[2] - offsetY) / scale, 
                 (position[3] - offsetZ) / scale
             }
-            function self.setLabel(label)
+            function self.setLabel(label, offX, offY)
                 local self = {}
                 local label = label
+                local offX = offX or 0
+                local offY = offY or 0
                 function self.setActionFunction(actionFunction)
                     local self = {}
                     function self.build()
-                        group[c] = {position, radius, fill, label, actionFunction}
+                        group[c] = {position, radius, fill, label, offX, offY, actionFunction}
                         c = c + 1
                     end
                     return self
                 end
                 function self.build()
-                    group[c] = {position, radius, fill, label, nil}
+                    group[c] = {position, radius, fill, label, offX, offY, nil}
                     c = c + 1
                 end
                 return self
             end
             function self.build()
-                group[c] = {position, radius, fill, nil, nil}
+                group[c] = {position, radius, fill, nil, nil, nil, nil}
                 c = c + 1
             end
             return self

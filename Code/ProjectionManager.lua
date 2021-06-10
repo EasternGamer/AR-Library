@@ -1,8 +1,4 @@
---[[
-This is the heart of the entire program... it's not well commented but here if you really want to take a look.
-]]
 function Projector(core, camera)
-    
     -- Localize frequently accessed data
     local library = library
     local core = core
@@ -237,10 +233,10 @@ function Projector(core, camera)
             local sP,sH,sR = s(objP),s(objR),s(objH)
             local cP,cH,cR = c(objP),c(objR),c(objH)
     
-            local wwx = (sinP * cosH*cosR - cosP * sinH * sinR)
-            local wwy = (cosP * sinH*cosR + sinP * cosH * sinR)
-            local wwz = (cosP * cosH* sinR - sinP * sinH * cosR)
-            local www = (cosP * cosH* cosR + sinP * sinH * sinR)
+            local wwx = sP*cH*cR - cP*sH*sR
+            local wwy = cP*sH*cR + sP*cH*sR
+            local wwz = cP*cH*sR - sP*sH*cR
+            local www = cP*cH*cR + sP*sH*sR
             local wx, wy, wz, ww = wwx,wwy,wwz,www
 
             local lix, liy, liz, liw = inverse(lx, ly, lz, lw)
@@ -352,8 +348,7 @@ function Projector(core, camera)
         modelMatrices[1] = {obj,{a2, -d2, -g2, objPosX,-b2, e2, h2, -objPosY,-c2, f2, i2, -objPosZ,0, 0, 0, 1}}
         return modelMatrices
     end
-
-    function self.getViewMatrix()
+	function self.getViewMatrix()
         local multi = multiply
         local solve = solve
         
@@ -461,8 +456,7 @@ function Projector(core, camera)
 
         return {a2, -d2, -g2, dotX,-b2, e2, h2, dotY,-c2, f2, i2, dotZ,0, 0, 0, 1}
     end
-    
-    function self.getSVG()
+	function self.getSVG()
         local svg = {}
         local c = 1
         local view = self.getViewMatrix()
@@ -615,7 +609,9 @@ function Projector(core, camera)
                             local radius = circle[2]
                             local fill = circle[3]
                             local label = circle[4]
-                            local action = circle[5]
+                            local offX = circle[5]
+                            local offY = circle[6]
+                            local action = circle[7]
                             svg[c] = '<circle cx="'
                             svg[c+1] = wx
                             svg[c+2] = '" cy="'
@@ -628,9 +624,9 @@ function Projector(core, camera)
                             c = c+9
                             if label ~= nil then
                                 svg[c] = '<text x="'
-                                svg[c+1] = wx
+                                svg[c+1] = wx + offX
                                 svg[c+2] = '" y="'
-                                svg[c+3] = wy
+                                svg[c+3] = wy + offY
                                 svg[c+4] = '">'
                                 svg[c+5] = label
                                 svg[c+6] = '</text>'
