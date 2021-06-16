@@ -223,6 +223,7 @@ Most people will not be using these functions.
 |Manager#inverse(qX, qY, qZ, qW)|Gets the inverse of a quaternion.|
 |Manager#multiply(ax, ay, az, aw, bx, by, bz, bw)|Multiplies two quaternions together.|
 |Manager#divide(ax, ay, az, aw, bx, by, bz, bw)|Multiplies the inverse of ``b`` quaternion with the ``a`` quaternion to "divide" the ``a`` quaternion by the ``b`` quaternion.|
+# EVERYTHING BELOW HAS NOT BEEN REWRITTEN/FINISHED!
 # Object
 
 An object represents an independent set of points. An object consists of its rotations, the point around which all the other points rotate and the point groups.
