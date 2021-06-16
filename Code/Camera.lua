@@ -43,7 +43,7 @@ cameraTypes = {
         },
         planet = {
             name = "planet",
-            pitchPos = rad(74.8),
+            pitchPos = rad(75),
             pitchNeg = rad(-75),
             headingPos = nil,
             headingNeg = nil,
@@ -51,7 +51,7 @@ cameraTypes = {
         },
         construct = {
             name = "construct",
-            pitchPos = rad(74.8),
+            pitchPos = rad(75),
             pitchNeg = rad(-75),
             headingPos = nil,
             headingNeg = nil,
@@ -176,7 +176,7 @@ function Camera(camType, position, orientation)
     end
     
     function self.setAlignmentType(alignmentType)
-        self.type = alignmentType
+        self.cType = alignmentType
     end
     
     function self.setPosition(pos)

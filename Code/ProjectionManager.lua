@@ -1,5 +1,6 @@
 function Projector(core, camera)
     -- Localize frequently accessed data
+    local utils = require('cpml.utils')
     local library = library
     local core = core
     local unit = unit
@@ -50,6 +51,8 @@ function Projector(core, camera)
     local sin, cos, tan = math.sin, math.cos, math.tan
     local rad, deg, sqrt = math.rad, math.deg, math.sqrt
     local atan = math.atan
+    local ceil, floor = math.ceil, math.floor
+    local round = utils.round
 
     -- Projection infomation
     --- Screen Parameters
@@ -57,11 +60,13 @@ function Projector(core, camera)
     local height = getHeight()/2
 
     --- FOV Paramters
-    local hfovRad = rad(getFov());
-    local fov = 2*atan(tan(hfovRad/2)*height,width)
+    
+    --local offset = (width + height) / 5000
+    local offset = 0
+    local hfovRad = rad(getFov() + offset)
+    local tanFov = tan(hfovRad/2)*height/width
 
     --- Matrix Subprocessing
-    local tanFov = tan(fov/2)
     local aspect = width/height
     local near = width/tanFov
     local top = near * tanFov
@@ -72,7 +77,7 @@ function Projector(core, camera)
     --- Matrix Paramters
     local x0 = 2 * near / (right - left)
     local y0 = 2 * near / (top - bottom)
-
+    
     -- Player-related values
     local playerId = unit.getMasterPlayerId()
     local unitId = unit.getId()
@@ -84,19 +89,22 @@ function Projector(core, camera)
     local alignmentType = nil
     
     --- Mouse info
-    local sensitivity = 1 -- export: Sensitivtiy
+    local sensitivity = 1 --export: Sensitivtiy
     local m = sensitivity*(width*2)*0.00104584100642898 + 0.00222458611638299
+
     local bottomLock = false
     local topLock = false
     local rightLock = false
     local leftLock = false
 
-    local self = {}
-    local objects = {}
+    local objectGroups = {}
+    
+    local self = {objectGroups = objectGroups}
 
     function self.getSize(size, zDepth, max, min)
         local pSize = atan(size, zDepth) * (near / aspect)
         local max = max or pSize
+        local min = min or pSize
         if pSize >= max then
             return max
         elseif pSize <= min then
@@ -117,8 +125,8 @@ function Projector(core, camera)
             local deltaMouseY = getMouseDeltaY()
             local deltaMouseX = getMouseDeltaX()
             local width = width
-            local deltaPitch = atan(-deltaMouseY/width) * m
-            local deltaHeading = atan(deltaMouseX/width) * m
+            local deltaPitch = atan(-deltaMouseY,width) * m
+            local deltaHeading = atan(deltaMouseX,width) * m
         
             local pPitch = cOrientation[1]
             local pHeading = cOrientation[2]
@@ -186,14 +194,14 @@ function Projector(core, camera)
         end
     end
 
-    function self.addObject(object)
-        local index = #objects + 1
-        objects[index] = object
+    function self.addObjectGroup(objectGroup, id)
+        local index = id or #objectGroups + 1
+        objectGroups[index] = objectGroup
         return index
     end
 
-    function self.removeObject(id)
-    	objects[id] = {}
+    function self.removeObjectGroup(id)
+    	objectGroups[id] = {}
     end
     
     function self.getModelMatrices(mObject)
@@ -290,7 +298,10 @@ function Projector(core, camera)
             local subObjects = object.subObjects
             if #subObjects > 0 then
                 for k = 1, #subObjects do
-                    recurse.subObjectMatrices(wwx, wwy, wwz, www, objX, objY, objZ, subObjects[k], posIX, posIY, posIZ)
+                    local subObj = subObjects[k]
+                    if subObj.position~=nil then
+                        recurse.subObjectMatrices(wwx, wwy, wwz, www, objX, objY, objZ, subObj, posIX, posIY, posIZ)
+                    end
                 end
             end
         end
@@ -342,7 +353,10 @@ function Projector(core, camera)
         local subObjs = obj.subObjects
         if #subObjs > 0 then
             for k = 1, #subObjs do
-                recurse.subObjectMatrices(wwx,wwy,wwz,www,objPos[1],objPos[2],objPos[3],subObjs[k],objPosX,objPosY,objPosZ)
+                local subObj = subObjs[k]
+                if subObj.position ~= nil then
+                    recurse.subObjectMatrices(wwx,wwy,wwz,www,objPos[1],objPos[2],objPos[3],subObj,objPosX,objPosY,objPosZ)
+                end
             end
         end
         modelMatrices[1] = {obj,{a2, -d2, -g2, objPosX,-b2, e2, h2, -objPosY,-c2, f2, i2, -objPosZ,0, 0, 0, 1}}
@@ -456,7 +470,8 @@ function Projector(core, camera)
 
         return {a2, -d2, -g2, dotX,-b2, e2, h2, dotY,-c2, f2, i2, dotZ,0, 0, 0, 1}
     end
-	function self.getSVG()
+    
+    function self.getSVG()
         local svg = {}
         local c = 1
         local view = self.getViewMatrix()
@@ -464,6 +479,8 @@ function Projector(core, camera)
         local vx1,vy1,vz1,vw1 = view[1],view[2],view[3],view[4]
         local vx2,vy2,vz2,vw2 = view[5],view[6],view[7],view[8]
         local vx3,vy3,vz3,vw3 = view[9],view[10],view[11],view[12]
+        
+        local getSize = self.getSize
         
         local function translate(x,y,z,mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
             local x,y,z = x,-y,-z
@@ -477,6 +494,54 @@ function Projector(core, camera)
             local wy = (pz / pw) * height
             return wx, wy, pw
         end
+        local function createCurve(svg,c,mx,my,cx1,cy1,cx2,cy2,ex,ey)
+            svg[c]='M'
+            svg[c+1]=mx
+            svg[c+2]=' '
+            svg[c+3]=my
+            svg[c+4]='C'
+            svg[c+5]=cx1
+            svg[c+6]=' '
+            svg[c+7]=cy1
+            svg[c+8]=','
+            svg[c+9]=cx2
+            svg[c+10]=' '
+            svg[c+11]=cy2
+            svg[c+12]=','
+            svg[c+13]=ex
+            svg[c+14]=' '
+            svg[c+15]=ey
+            return c+16
+        end
+        local function createLabel(svg,c,x,y,text,size,opacity,fill)
+            svg[c] = '<text x="'
+            svg[c+1] = x
+            svg[c+2] = '" y="'
+            svg[c+3] = y
+            c=c+4
+            if opacity~=nil then
+                svg[c] = '" fill-opacity="'
+                svg[c+1] = opacity
+                svg[c+2] = '" stroke-opacity="'
+                svg[c+3] = opacity
+                c=c+4
+            end
+            if fill~=nil then
+                svg[c] = '" fill="'
+                svg[c+1]=fill
+                c=c+2
+            end
+            if size~=nil then
+                svg[c] = '" font-size="'
+                svg[c+1]=size
+                c=c+2
+            end
+            
+            svg[c] = '">'
+            svg[c+1] = text
+            svg[c+2] = '</text>'
+            return c+3
+        end
         -- Localize projection matrix values
         local px1 = x0
         local py2 = 1 --c0
@@ -486,203 +551,310 @@ function Projector(core, camera)
         local width = width
         local height = height
 
-        for i = 1, #objects do
-            
-            local object = objects[i]
-            local objTransX = object.transX or width
-            local objTransY = object.transY or height
+        local objectGroups = objectGroups
+        for i = 1, #objectGroups do
+            local objectGroup = objectGroups[i]
+            if objectGroup.enabled == true then
+            local objGTransX = objectGroup.transX or width
+            local objGTransY = objectGroup.transY or height
+            local objects = objectGroup.objects
             
             svg[c] = [[<svg viewBox="0 0 ]]
             svg[c+1] = width*2
             svg[c+2] = [[ ]]
             svg[c+3] = height*2
             svg[c+4] = [[" class="]]
-            svg[c+5] = object.style
+            svg[c+5] = objectGroup.style
             svg[c+6] = '"><g transform="translate('
-            svg[c+7] = objTransX
+            svg[c+7] = objGTransX
             svg[c+8] = ','
-            svg[c+9] = objTransY
+            svg[c+9] = objGTransY
             svg[c+10] = ')">'
             c=c+11
-            local models = self.getModelMatrices(object)
-            
-            -- Localize model matrix values
-            for k = 1, #models do
-                local modelObj = models[k]
-                local object = modelObj[1]
-                local model = modelObj[2]
+            for m = 1, #objects do
+                local obj = objects[m]
+                if obj.position ~= nil then
+                local models = self.getModelMatrices(obj)
+                -- Localize model matrix values
+                for k = 1, #models do
+                    local modelObj = models[k]
+                    local object = modelObj[1]
+                    local model = modelObj[2]
+                    
+                    local objStyle = object.style
+                    local objTransX = object.transX or 0
+                    local objTransY = object.transY or 0
+                    
+                    svg[c] = '<g class="'
+                    svg[c+1] = objStyle
+                    c=c+2
+                    if objTransX ~= 0 or objTransY ~= 0 then
+                            svg[c] = '" transform="translate('
+                            svg[c+1] = objTransX
+                            svg[c+2] = ','
+                            svg[c+3] = objTransY
+                            svg[c+4] = ')'
+                            c=c+5
+                    end
+                    svg[c] = '">'
+                    c=c+1
+                    local mx1,my1,mz1,mw1 = model[1],model[2],model[3],model[4]
+                    local mx2,my2,mz2,mw2 = model[5],model[6],model[7],model[8]
+                    local mx3,my3,mz3,mw3 = model[9],model[10],model[11],model[12]
                 
-                local mx1,my1,mz1,mw1 = model[1],model[2],model[3],model[4]
-                local mx2,my2,mz2,mw2 = model[5],model[6],model[7],model[8]
-                local mx3,my3,mz3,mw3 = model[9],model[10],model[11],model[12]
-                
-                local mXX = px1*(vx1*mx1 + vy1*mx2 + vz1*mx3)
-                local mXY = px1*(vx1*my1 + vy1*my2 + vz1*my3)
-                local mXZ = px1*(vx1*mz1 + vy1*mz2 + vz1*mz3)
-                local mXW = px1*(vw1 + vx1*mw1 + vy1*mw2 + vz1*mw3)
+                    local mXX = px1*(vx1*mx1 + vy1*mx2 + vz1*mx3)
+                    local mXY = px1*(vx1*my1 + vy1*my2 + vz1*my3)
+                    local mXZ = px1*(vx1*mz1 + vy1*mz2 + vz1*mz3)
+                    local mXW = px1*(vw1 + vx1*mw1 + vy1*mw2 + vz1*mw3)
         
-                local mYX = (vx2*mx1 + vy2*mx2 + vz2*mx3)
-                local mYY = (vx2*my1 + vy2*my2 + vz2*my3)
-                local mYZ = (vx2*mz1 + vy2*mz2 + vz2*mz3)
-                local mYW = (vw2 + vx2*mw1 + vy2*mw2 + vz2*mw3)
+                    local mYX = (vx2*mx1 + vy2*mx2 + vz2*mx3)
+                    local mYY = (vx2*my1 + vy2*my2 + vz2*my3)
+                    local mYZ = (vx2*mz1 + vy2*mz2 + vz2*mz3)
+                    local mYW = (vw2 + vx2*mw1 + vy2*mw2 + vz2*mw3)
         
-                local mZX = pz3*(vx3*mx1 + vy3*mx2 + vz3*mx3)
-                local mZY = pz3*(vx3*my1 + vy3*my2 + vz3*my3)
-                local mZZ = pz3*(vx3*mz1 + vy3*mz2 + vz3*mz3)
-                local mZW = pz3*(vw3 + vx3*mw1 + vy3*mw2 + vz3*mw3)
+                    local mZX = pz3*(vx3*mx1 + vy3*mx2 + vz3*mx3)
+                    local mZY = pz3*(vx3*my1 + vy3*my2 + vz3*my3)
+                    local mZZ = pz3*(vx3*mz1 + vy3*mz2 + vz3*mz3)
+                    local mZW = pz3*(vw3 + vx3*mw1 + vy3*mw2 + vz3*mw3)
                 
-                local polylineGroups = object.polylineGroups
-                local circleGroups = object.circleGroups
-                local curvesGroups = object.curvesGroups
-                local customGroups = object.customGroups
+                    local polylineGroups = object.polylineGroups
+                    local circleGroups = object.circleGroups
+                    local curvesGroups = object.curveGroups
+                    local customGroups = object.customGroups
             
-                -- Polylines for-loop
-                for d=1,#polylineGroups do
-                    local polylineGroup = polylineGroups[d]
-                    svg[c] = '<path class="'
-                    svg[c+1] = polylineGroup[1]
-                    svg[c+2] = '" d="'
-                    c = c+3
-                    for f=2,#polylineGroup do
-                        local line = polylineGroup[f]
-                        svg[c] = 'M '
-                        local lC=0
-                        local sP={}
-                        local eP={}
-                        c=c+1
-                        for h = 1, #line do
-                            local p = line[h]
-                            local wx,wy,ww = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                    -- Polylines for-loop
+                    for d=1,#polylineGroups do
+                        local polylineGroup = polylineGroups[d]
+                        svg[c] = '<path class="'
+                        svg[c+1] = polylineGroup[1]
+                        svg[c+2] = '" d="'
+                        c = c+3
+                        for f=2,#polylineGroup do
+                            local line = polylineGroup[f]
+                            svg[c] = 'M '
+                            local lC=0
+                            local sP={}
+                            local eP={}
+                            c=c+1
+                            for h = 1, #line do
+                                local p = line[h]
+                                local wx,wy,ww = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
 
-                            -- If PW is negative, it means the point is behind you
-                            if ww > 0 then
-                                if lC ~= 0 then
-                                    svg[c] = ' L '
-                                    c = c + 1
-                                    eP = {wx, wy}
-                                else
-                                    sP = {wx, wy}
+                                -- If PW is negative, it means the point is behind you
+                                if ww > 0 then
+                                    if lC ~= 0 then
+                                        svg[c] = ' L '
+                                        c = c + 1
+                                        eP = {wx, wy}
+                                    else
+                                        sP = {wx, wy}
+                                    end
+                                    svg[c] = wx
+                                    svg[c+1] = ' '
+                                    svg[c+2] = wy
+                                    c=c+3
+                                    lC=lC+1
                                 end
-                                svg[c] = wx
-                                svg[c+1] = ' '
-                                svg[c+2] = wy
-                                c=c+3
-                                lC=lC+1
                             end
-                        end
-                        if lC < 2 then
-                            if lC == 1 then
-                                svg[c-4] = ''
-                                svg[c-3] = ''
-                                svg[c-2] = ''
-                                svg[c-1] = ''
-                                c=c-4
+                            if lC < 2 then
+                                if lC == 1 then
+                                    svg[c-4] = ''
+                                    svg[c-3] = ''
+                                    svg[c-2] = ''
+                                    svg[c-1] = ''
+                                    c=c-4
+                                else
+                                    svg[c-1] = ''
+                                    c=c-1
+                                end
                             else
-                                svg[c-1] = ''
-                                c=c-1
-                            end
-                        else
-                            if eP[1] == sP[1] and eP[2] == sP[2] then
-                                svg[c-4] = ' Z '
-                                svg[c-3] = ''
-                                svg[c-2] = ''
-                                svg[c-1] = ''
-                                c=c-3
+                                if eP[1] == sP[1] and eP[2] == sP[2] then
+                                    svg[c-4] = ' Z '
+                                    svg[c-3] = ''
+                                    svg[c-2] = ''
+                                    svg[c-1] = ''
+                                    c=c-3
+                                end
                             end
                         end
+                        svg[c] = '"/>'
+                        c=c+1
                     end
-                    svg[c] = '"/>'
-                    c=c+1
-                end
-                for cG=1,#circleGroups do
-                    local circleGroup = circleGroups[cG]
-                    svg[c] = '<g class="'
-                    svg[c+1] = circleGroup[1]
-                    svg[c+2] = '">'
-                    c=c+3
-                    for l=2, #circleGroup do
-                        local circle = circleGroup[l]
-                        local p = circle[1]
-                        
-                        local wx, wy, wz = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
-                        if wz > 0 then
-                            local radius = circle[2]
-                            local fill = circle[3]
-                            local label = circle[4]
-                            local offX = circle[5]
-                            local offY = circle[6]
-                            local action = circle[7]
-                            svg[c] = '<circle cx="'
-                            svg[c+1] = wx
-                            svg[c+2] = '" cy="'
-                            svg[c+3] = wy
-                            svg[c+4] = '" r="'
-                            svg[c+5] = radius
-                            svg[c+6] = '" fill="'
-                            svg[c+7] = fill
-                            svg[c+8] = '"/>'
-                            c = c+9
-                            if label ~= nil then
-                                svg[c] = '<text x="'
-                                svg[c+1] = wx + offX
-                                svg[c+2] = '" y="'
-                                svg[c+3] = wy + offY
-                                svg[c+4] = '">'
-                                svg[c+5] = label
-                                svg[c+6] = '</text>'
-                                c=c+7
-                            end
-                            if action ~= nil then
-                                c = action(svg, c, object, wx, wy, wz)
+                    for cG=1,#circleGroups do
+                        local circleGroup = circleGroups[cG]
+                        svg[c] = '<g class="'
+                        svg[c+1] = circleGroup[1]
+                        svg[c+2] = '">'
+                        c=c+3
+                        for l=2, #circleGroup do
+                            local cir = circleGroup[l]
+                            local p = cir[1]
+                            local wx,wy,wz = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                            if wz > 0 then
+                                local radius,fill,label,offX,offY,size,resize,action = cir[2],cir[3],cir[4],cir[5],cir[6],cir[7],cir[8],cir[9]
+                                svg[c] = '<circle cx="'
+                                svg[c+1] = wx
+                                svg[c+2] = '" cy="'
+                                svg[c+3] = wy
+                                svg[c+4] = '" r="'
+                                svg[c+5] = radius
+                                svg[c+6] = '" fill="'
+                                svg[c+7] = fill
+                                svg[c+8] = '"/>'
+                                c = c+9
+                                if label ~= nil then
+                                    svg[c] = '<text x="'
+                                    svg[c+1] = wx + offX
+                                    svg[c+2] = '" y="'
+                                    svg[c+3] = wy + offY
+                                    c=c+4
+                                    if size ~= nil then
+                                        if resize==true then
+                                           svg[c]='" font-size="'
+                                           svg[c+1] = getSize(size, wz)
+                                        else
+                                           svg[c]='" font-size="'
+                                           svg[c+1] = size
+                                        end
+                                        c=c+2
+                                    end
+                                    svg[c] = '">'
+                                    svg[c+1] = label
+                                    svg[c+2] = '</text>'
+                                    c=c+3
+                                end
+                                if action ~= nil then
+                                    c = action(svg, c, object, wx, wy, wz)
+                                end
                             end
                         end
+                        svg[c] = '</g>'
+                        c=c+1
                     end
-                    svg[c] = '</g>'
-                    c=c+1
-                end
-                for cG = 1, #customGroups do
-                    local customGroup = customGroups[cG]
-                    local multiGroups = customGroup[2]
-                    local singleGroups = customGroup[3]
-                    svg[c] = '<g class="'
-                    svg[c+1] = customGroup[1]
-                    svg[c+2] = '">'
-                    c = c+3
-                    for mGC = 1, #multiGroups do
-                        local multiGroup = multiGroups[mGC]
-                        local pts = multiGroup[1]
-                        local tPoints = {}
-                        local ct = 1
-                        for pC = 1, #pts do
-                            local p = pts[pC]
-                            local tx,ty,tz = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                    for cuG=1, #curvesGroups do
+                            local curveG = curvesGroups[cuG]
+                            svg[c] = '<g class="'
+                            svg[c+1] = curveG[1]
+                            svg[c+2] = '">'
+                            c=c+3
+                            local curveG = curvesGroups[cuG]
+                            svg[c] = '<path d="'
+                            c=c+1
+                            local curves = curveG[2]
+                            local sLabelDat = {}
+                            local sLDC = 0
+                            for cCt=1, #curves do
+                                local curve = curves[cCt]
+                                if curve[1] == 'circle' then
+                                    local pts = curve[2]
+                                    local labelDat = curve[3]
+                                    local p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12 = pts[1],pts[2],pts[3],pts[4],pts[5],pts[6],pts[7],pts[8],pts[9],pts[10],pts[11],pts[12]
+                                    local m1x,m1y,m1z=translate(p1[1],p1[2],p1[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    local m2x,m2y,m2z=translate(p2[1],p2[2],p2[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    local m3x,m3y,m3z=translate(p3[1],p3[2],p3[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    local m4x,m4y,m4z=translate(p4[1],p4[2],p4[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    if m1z>0 and m2z>0 and m3z>0 and m4z>0 then
+                                            c=createCurve(svg,c,m1x,m1y,m2x,m2y,m3x,m3y,m4x,m4y)
+                                    end
+                                    local m5x,m5y,m5z=translate(p5[1],p5[2],p5[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    local m6x,m6y,m6z=translate(p6[1],p6[2],p6[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    local m7x,m7y,m7z=translate(p7[1],p7[2],p7[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    if m4z>0 and m5z>0 and m6z>0 and m7z>0 then
+                                            c=createCurve(svg,c,m4x,m4y,m5x,m5y,m6x,m6y,m7x,m7y)
+                                    end
+                                    local m8x,m8y,m8z=translate(p8[1],p8[2],p8[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    local m9x,m9y,m9z=translate(p9[1],p9[2],p9[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    local m10x,m10y,m10z=translate(p10[1],p10[2],p10[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    if m7z>0 and m8z>0 and m9z>0 and m10z>0 then
+                                            c=createCurve(svg,c,m7x,m7y,m8x,m8y,m9x,m9y,m10x,m10y)
+                                    end    
+                                    local m11x,m11y,m11z=translate(p11[1],p11[2],p11[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    local m12x,m12y,m12z=translate(p12[1],p12[2],p12[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                    if m10z>0 and m11z>0 and m12z>0 and m1z>0 then
+                                            c=createCurve(svg,c,m10x,m10y,m11x,m11y,m12x,m12y,m1x,m1y)
+                                    end
+                                    if labelDat[1]~=nil then
+                                            if m1z>0 and m4z>0 and m7z>0 and m10z>0 then
+                                                sLabelDat[sLDC+1]={
+                                                    {m1x,m1y,m1z},
+                                                    {m4x,m4y,m4z},
+                                                    {m7x,m7y,m7z},
+                                                    {m10x,m10y,m10z},
+                                                    labelDat
+                                                }
+                                                sLDC=sLDC+1
+                                            end
+                                    end
+                                else
+                                end
+                            end
+                            svg[c] = '"/>'
+                            c=c+1
+                            if sLDC > 0 then
+                                for ll=1, sLDC do
+                                        local lInfo = sLabelDat[ll]
+                                        local p1,p2,p3,p4,dat = lInfo[1],lInfo[2],lInfo[3],lInfo[4],lInfo[5]
+                                        local s = dat[3]
+                                        local s1,s2,s3,s4 = s,s,s,s
+                                        local label = dat[1]
+                                        if dat[2] == true then
+                                            s1,s2,s3,s4 = getSize(s1, p1[3], 100, 1), getSize(s2, p2[3], 100, 1), getSize(s3, p3[3], 100, 1), getSize(s4, p4[3], 100, 1)
+                                        end
+                                        c=createLabel(svg,c,p1[1],p1[2],label,s1,nil,'white')
+                                        c=createLabel(svg,c,p2[1],p2[2],label,s2,nil,'white')
+                                        c=createLabel(svg,c,p3[1],p3[2],label,s3,nil,'white')
+                                        c=createLabel(svg,c,p4[1],p4[2],label,s4,nil,'white')
+                                end
+                            end
+                    end
+                    for cG = 1, #customGroups do
+                        local customGroup = customGroups[cG]
+                        local multiGroups = customGroup[2]
+                        local singleGroups = customGroup[3]
+                        svg[c] = '<g class="'
+                        svg[c+1] = customGroup[1]
+                        svg[c+2] = '">'
+                        c = c+3
+                        for mGC = 1, #multiGroups do
+                            local multiGroup = multiGroups[mGC]
+                            local pts = multiGroup[1]
+                            local tPoints = {}
+                            local ct = 1
+                            for pC = 1, #pts do
+                                local p = pts[pC]
+                                local tx,ty,tz = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
+                                if tz > 0 then
+                                    tPoints[ct] = {tx,ty,tz}
+                                    ct = ct + 1
+                                end
+                            end
+                            if ct ~= 1 then
+                                local drawFunction = multiGroup[2]
+                                local data = multiGroup[3]
+                                c = drawFunction(svg, c, object, tPoints, data)
+                            end
+                        end
+                        for sGC = 1, #singleGroups do
+                            local singleGroup = singleGroups[sGC]
+                            local p = singleGroup[1]
+                            local tx, ty, tz = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
                             if tz > 0 then
-                                tPoints[ct] = {tx,ty,tz}
-                                ct = ct + 1
+                                local drawFunction = singleGroup[2]
+                                local data = singleGroup[3]
+                                c = drawFunction(svg,c,object,tx,ty,tz,data)
                             end
                         end
-                        if ct ~= 1 then
-                            local drawFunction = multiGroup[2]
-                            local data = multiGroup[3]
-                            c = drawFunction(svg, c, object, tPoints, data)
-                        end
-                    end
-                    for sGC = 1, #singleGroups do
-                        local singleGroup = singleGroups[sGC]
-                        local p = singleGroup[1]
-                        local tx, ty, tz = translate(p[1],p[2],p[3],mXX,mXY,mXZ,mXW,mYX,mYY,mYZ,mYW,mZX,mZY,mZZ,mZW)
-                        if tz > 0 then
-                            local drawFunction = singleGroup[2]
-                            local data = singleGroup[3]
-                            c = drawFunction(svg,c,object,tx,ty,tz,data)
-                        end
+                        svg[c] = '</g>'
+                        c=c+1
                     end
                     svg[c] = '</g>'
                     c=c+1
+                end
                 end
             end
             svg[c] = '</g></svg>'
             c = c+1
+            end
         end
         return svg, c
     end
