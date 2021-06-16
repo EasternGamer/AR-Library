@@ -1,3 +1,5 @@
+local position = {0,0,0}
+local offsetPos = {0,0,0}
 local safeZones = {
   {id = 1, name = "Madis", center = {17465536,22665536,-34464}, 
         satellites = {
@@ -56,22 +58,25 @@ local safeZones = {
   {name = "Tutorial Planet", center = {84000000016.5690,92999999983.4165,54000000022.9705}}
 }
 
--- Parameters
-local style = "PlanetGroup"
-local position = {0,5,0}
-local offsetPos = {0,0,0}
 local orientation = {0,0,0}
-
+local width = system.getScreenWidth() / 2
+local height = system.getScreenHeight() / 2
 local objectBuilder = ObjectBuilderLinear()
--- The linear builder essentially as the names says, linear, it must be built in this order.
+
+local camera = Camera(cameraTypes.player.construct, {0,0,0}, {0,0,0})
+projector = Projector(core, camera)
+
+local planetGroup = ObjectGroup("PlanetGroup")
+projector.addObjectGroup(planetGroup)
+
 planets = objectBuilder
-				.setStyle(style) -- Sets the class of this graphic
-				.setPosition(position) -- Sets the position of the object, around which it rotates
-				.setOffset(offsetPos) -- Sets the offset, usually not used but sometimes useful
-				.setOrientation(orientation) -- Sets the default pitch, heading and roll (in degrees)
-				.setPositionType(positionTypes.localP) -- Sets how the position relates to the world.
-				.setOrientationType(orientationTypes.localO) -- Sets how the orientation relates to the world.
-				.build() -- creates the object
+   			.setStyle("obj")
+   			.setPosition({0,5,0}) --x,y,z
+   			.setOffset({0,0,0}) --x,y,z
+   			.setOrientation({0,0,0}) --pitch,heading,roll
+   			.setPositionType(positionTypes.localP)
+   			.setOrientationType(orientationTypes.localO)
+   			.build()
 ship = objectBuilder
 				.setStyle("ship") -- Sets the class of this graphic
 				.setPosition(position) -- Sets the position of the object, around which it rotates
@@ -80,15 +85,7 @@ ship = objectBuilder
 				.setPositionType(positionTypes.localP) -- Sets how the position relates to the world.
 				.setOrientationType(orientationTypes.localO) -- Sets how the orientation relates to the world.
 				.build() -- creates the object
-ship.setCircles(1, "Player", 50000000).addCircle({0,0,0}, 3, "green").setLabel("Me").build()
--- ^ Adds a a green circle at 0,0,0 of the *object* with a radius of 3.
-planets.setSubObjects().addSubObject(ship)
--- Creates the camera with the initial super type and the initial position and orientation, respectively.
-local camera = Camera("player", {0,0,0}, {0,0,0})
-
-projector = Projector(core, camera) -- Creates the projector
-projector.addObject(planets) -- Adds the planets to the projector
-
+planetGroup.addObject(planets)
 -- Now to actually add data to the planets, we do the following.
 local scale = 50000000 -- i.e. 1:50000000
 local planetCircles = planets.setCircles(1, "planets", scale)
@@ -102,8 +99,11 @@ for ii = 1, #safeZones do
     	.build() -- Tells the program you are done with creating it and adds it.
 end
 
+ship.setCircles(1, "Player", 50000000).addCircle({0,0,0}, 3, "green").setLabel("Me").build()
+-- ^ Adds a a green circle at 0,0,0 of the *object* with a radius of 3.
+planets.addSubObject(ship)
 
-unit.setTimer("fixed_1", 1/1000) --The timer to update the camera
-unit.setTimer("update", 1/1000) -- The timer to update the screen
+unit.setTimer("fixed_1", 1/1000)
+unit.setTimer("update", 1/1000)
 system.showScreen(1)
 unit.hide()

@@ -104,12 +104,12 @@ function Object(style, position, offset, orientation, positionType, orientationT
             local size = nil
             local resize = false
             local action = nil
-            function self.setLabel(label, resize, size, offX, offY)
-                label = label
-                offX = offX or 0
-                offY = offY or 0
-                size = size or 10
-                resize = resize or false
+            function self.setLabel(lab, rs, s, ofX, ofY)
+                label = lab
+                offX = ofX or 0
+                offY = ofY or 0
+                size = s or 10
+                resize = rs or false
                 return self
             end
             function self.setActionFunction(actionFunction)

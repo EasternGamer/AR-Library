@@ -1,8 +1,8 @@
+local concat = table.concat
 local svg, index = projector.getSVG()
 
 local width = system.getScreenWidth()
 local height = system.getScreenHeight()
-
 svg[index] =
 [[
 <style>
@@ -11,5 +11,5 @@ svg{ width:]]..width ..[[px; height:]]..height ..[[px; position:absolute; top:0p
 .PlanetGroup{filter: drop-shadow(0 0 0.5rem black);}
 .planets{ stroke: #defff0; fill: white; text-align: center;}
 </style>]]
-local rendered = table.concat(svg)
+local rendered = concat(svg)
 system.setScreen(rendered)
