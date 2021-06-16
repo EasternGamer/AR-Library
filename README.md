@@ -2,7 +2,7 @@
 
 Hello there, I will warn you in advance, this is **not** for your average user. This is for other script developers to implement in their own scripts.
 
-In summary, this is an **application programming interface**, API for short. This API allows a 1:1 presentation of something in the game world--i.e., it exists as if it were apart of the game world. It is an example of a high-level API. You provide it points, it does everything in the backend and produces the entire SVG for you.
+In summary, this is an **application programming interface**, API for short. This API allows a 1:1 presentation of something in the game world—i.e., it exists as if it were apart of the game world. It is an example of a high-level API. You provide it points, it does everything in the backend and produces the entire SVG for you.
 
   
 
@@ -26,21 +26,16 @@ That being said, you **can** do some pretty advanced stuff.
 |TransY|The translation of the Y value, primarily used for moving fixed camera views to the corner of your screen.|
 |Resize|If text should automatically scale using perspective scalling|
 |Size|The size of text in meters. *Not affected by scaling parameter*|
-|Func|A user-defined function which accepts the following functions in order: svg, c, object, x, y, z, where x, y, z are the transformed values of the point, relating to screen coordinates.
+|Func|A user-defined function which accepts the following parameters in order: *svg, c, object, x, y, z*, where x, y, z are the transformed values of the point, relating to screen coordinates.
+|Data|Literally anything. An object, a function, a number, a string, you name it, it can be it.|
+|mDraw|A user-defined function which accepts the following parameters in order: *svg, c, object, points, data*|
+|sDraw|A user-defined function which accepts the following parameters in order: *svg, c, object, x, y, z, data*|
 
 # Codex
-### Object Group Functions
-| Function Name | Description|
-|--|--|
-|ObjectGroup(style, objects, transX, transY)|How a group is made, objects, transX and transY are optional. Returns the object group|
-|ObjectGroup#addObject(object, id)|Adds an object at a given index ID, the index ID is optional. Returns the index ID of the object|
-|ObjectGroup#removeObject(id)|Removes an object from the group with a given ID index with an empty array.|
-|Object#hide()|Halts processing of any objects within the object group, effectively "hiding" the objects.|
-|Object#show()|Resumes processing of any objects within the object group, effectively "showing" the objects.|
 ### Object Functions
-| Function Name | Description|
+| *Function Name* | *Description*|
 |--|--|
-|Object(style, point, offset, orientation, positionType, orientationType, transX, transY)| Usually never used directly.|
+|**Object(style, point, offset, orientation, positionType, orientationType, transX, transY)**| Usually never used directly.|
 |Object#setPolylines(groupId, style, points, scale) |Sets a group of polylines|
 |Object#setCircles(groupId, style, scale)|Initiates the circle builder|
 |CircleBuilder#addCircle(point, radius, fill)|Adds a circle at the point with a given radius and fill colour|
@@ -58,65 +53,176 @@ That being said, you **can** do some pretty advanced stuff.
 |BezierBuilder#TBD|TBD|
 |BezierBuilder#TBD|TBD|
 |BezierBuilder#build()|Adds the curve to the curve group|
+|Object#setCustomSVGs(groupId, style, scale)|Initiates the custom SVG builders and returns CustomSVG|
+|CustomSVG#addMultiPointSVG()|Initiates the multi-point SVG builder. Useful for anything that needs to be transformed and linked together. Think a box, or rectangle. Returns MPSVG|
+|MPSVG#addPoint(point)|Adds a point, in order of addition, to the multipoint group|
+|MPSVG#bulkSetPoints(points)|Overrides points. *No processing is done using this function. (No offset and no scaling)*
+|MPSVG#setData(data)|Sets data associated with the points|
+|MPSVG#setDrawFuncton(mDraw)|Sets a draw function to be called to send the processed points to|
+|MPSVG#build()|Adds the point group, if valid, to the multipoint group
+|CustomSVG#addSinglePointSVG()|Initiates the single point SVG builder. Useful for anything that needs only a point location. Think of pre-baked SVGs you just want to move around in the world. Returns SPSVG|
+|SPSVG#setPosition(point)|Sets the point in the world to add it to.|
+|SPSVG#setData(data)|Sets data associated with the points|
+|SPSVG#setDrawFuncton(sDraw)|Sets a draw function to be called to send the processed point to|
+|SPVG#build()|Adds the point, if valid, to the single point group.|
+|Object#rotateHeading(heading)|Rotates the heading, i.e. the z-axis, of the object around the object's position. *Note: Heading is in degrees.*|
+|Object#rotatePitch(pitch)|Rotates the pitch, i.e. the x-axis, of the object around the object's position. *Note: Pitch is in degrees.*|
+|Object#rotateRoll(roll)|Rotates the roll, i.e. the y-axis, of the object around the object's position. *Note: Roll is in degrees.*|
+|Object#setPosition(point)|Sets the position of an object.|
+|Object#addSubObject(object, id)|Adds a sub object at a given ID, or if no ID is present, it will add it to end of the sub object array. Returns the index, ID.|
+|Object#removeSubObject(id)|Replaces a sub object with an empty array at the given index, id.|
+|Object#setSubObjects()|Initiates the sub object builder, essentially overriding the current sub objects. Returns the SubObjectBuilder|
+|SubObjectBuilder#addSubObject(object)|Adds the sub object to the sub object array|
 
-#### Set Polylines
+### ObjectBuilderLinear
+This is a special way to build an object in which it must be built in a specific order.
+The codex will list them in order of execution. For brevity, ObjectBuilderLinear will be listed as OBL.
+|*Function*|*Description*|
+|--|--|
+|**OBL()**|Initiates the linear object builder.|
+|OBL#setStyle(style)|Sets the style class of the object.|
+|OBL#setPosition(point)|Sets the initial position of the object|
+|OBL#setOffset(offset)|Sets the offset of the object's points|
+|OBL#setOrientation(orientation)|Sets the default orientation of the object|
+|OBL#setPositionType(positionType)|Sets the position type of the object|
+|OBL#setOrientationType(orientationType)|Sets the orientation type of the object|
+|OBL#setTranslation(transX,transY)|[Optional] Sets the translated position of the projection.|
+|OBL#build()|Constructs the object.|
+#### Example
+ ```lua
+ local objectBuilder = ObjectBuilderLinear()
+ local waypoint = objectBuilder
+				.setStyle(wName)
+				.setPosition({0,0,0}) --x,y,z
+				.setOffset({0,0,0}) --x,y,z
+				.setOrientation({0,0,0}) --pitch,heading,roll
+				.setPositionType(positionTypes.globalP)
+				.setOrientationType(orientationTypes.globalO)
+				.build()
+ ```
+### Object Group Functions
+| *Function Name* | *Description*|
+|--|--|
+|**ObjectGroup(style, objects, transX, transY)**|How a group is made, objects, transX and transY are optional. Returns the object group|
+|ObjectGroup#addObject(object, id)|Adds an object at a given index ID, the index ID is optional. Returns the index ID of the object|
+|ObjectGroup#removeObject(id)|Removes an object from the group with a given ID index with an empty array.|
+|Object#hide()|Halts processing of any objects within the object group, effectively "hiding" the objects.|
+|Object#show()|Resumes processing of any objects within the object group, effectively "showing" the objects.|
+#### Example
+```lua
+local warpable = ObjectGroup("Warp")
+warpable.addObject(waypoint, 1)
+```
 
 ### Camera Functions
+There are two main types of camera, fixed and player. 
+Each are broken down further with different behaviours and functions.
+```lua
+fixed = {
+	fLocal,
+	fGlobal
+}
+player = {
+	jetpack,
+    planet,
+    construct,
+    chair = {
+       firstPerson = {
+            mouseControlled,
+            freelook
+       },
+       secondPerson, --Currently not supported
+       thirdPerson --Currently not supported
+    }
+}
+```
+|*Functions*|*Description*|
+|--|--|
+|**Camera(camType, position, orientation)**|Camera type is any one of the above types, position is the point in space it is initially and orientation is an array in the order pitch, heading, roll.|
+|Camera#rotateHeading(heading)|Rotates the heading, i.e. the z-axis, of the camera around the camera's position. *Note: Heading is in degrees.*|
+|Camera#rotatePitch(pitch)|Rotates the pitch, i.e. the x-axis, of the camera around the camera's position. *Note: Pitch is in degrees.*|
+|Camera#rotateRoll(roll)|Rotates the roll, i.e. the y-axis, of the camera around the camera's position. *Note: Roll is in degrees.*|
+|Camera#setAlignmentType(camType)|Sets the camera type. Usually useful if you want to switch between a fixed camera view and a player camera view depending on a toggle.|
+|Camera#setPosition(position)|Sets the camera's position relative to the type of camera it is.|
+|Camera#setViewLock(isViewLocked)|This sets if the camera's angle should be moved by the mouse inside a seat. Useful for switching this on if you pilot using the mouse.|
+|Camera#getAlignmentType(ax, ay, az, aw, bodyX, bodyY, bodyZ)|The quaternion x, y, z and w values of your rotation and the position of your body. Returns the camera type. *Not intended for external usage.*|
+#### Example
+```lua
+local camera = Camera(cameraTypes.player.construct, {0,0,0}, {0,0,0})
 
-- Camera creation
+camera.setViewLock(not freelook)
+projector = Projector(core, camera)
+```
+### Projector Functions
+Some of the functions provided here are not useful for the end user.
+|*Functions*|*Description*|
+|--|--|
+|**Projector(core, camera)**|Creates the projector object.|
+|Projector#getSize(size, zDepth, max, min)|Gets the physically projected radius of a given size, assuming the object was not rotated. Max is the max value in pixels and min is the min value of pixels. Both are optional|
+|Projector#updateCamera()|This call updates the camera parameters if the camera type is of the player|
+|Projector#addObjectGroup(objectGroup, id)|Adds an object group at a given index ID, or if no index ID is given, it will place it at the end of the array. Returns the ID of the object group.|
+|Projector#removeObjectGroup(id)|Replaces the object group at the given index with an empty array.|
+|Projector#getModelMatrices(object)|Gets the model matrices associated with the object. *Not intended for external use.* Returns an array of model matrices.|
+|Projector#getViewMatrix()|Gets the view matrix of your camera. *Not intended for external use.*|
+|Projector#getSVG()|Gets the SVG table and the latest index of autogenerated SVG content. **Critical for operation of this script.**|
+#### Example
+```lua
+-- Defined in unit.start()
+projector = Projector(core, camera)
+projector.addObjectGroup(warpable)
 
-- Setting a Position
+system.showScreen(1)
+unit.setTimer("fixed_1", 1/1000)
+unit.setTimer("update", 1/1000)
 
-- Setting Orientation
+-- In fixed_1
+projector.updateCamera()
 
-- Settings Manipulation
+-- In update
+local concat = table.concat
+local svg, index = projector.getSVG()
 
-### Projection Functions
+local width = system.getScreenWidth()
+local height = system.getScreenHeight()
 
-- Getting the view matrix
-
-- Getting the object matices
-
-- Getting the SVG
+svg[index] = [[
+<style>
+	svg{ 
+		width:]] .. width .. [[px; 
+		height:]] .. height .. [[px; 
+		position:absolute; 
+		top:0px; 
+		left:0px;
+	}
+	.Warp{
+		filter: drop-shadow(0 0 0.5rem red); 
+		stroke: red;
+		stroke-width: 3; 
+		vertical-align:middle; 
+		text-anchor:start; 
+		fill: white; 
+		font-family: Helvetica; 
+		font-size: 20px;
+	 }
+</style>]]
+local rendered = concat(svg)
+system.setScreen(rendered)
+```
 
 ### Manager Functions
-
-- Rotation matrix to quaternion
-
-- Local to global
-
-- Global to local
-
-- Quaternion Multiplication, "division", inversion and subtraction.
-
-### Simple Examples
-
-- Rotating System
-
-- Planet markers in the world.
-
-- Polyline ship wireframe
-
-### Advanced Examples
-
-- Moons orbiting a planet with a planet orbitting a star system.
-
-- Custom multiple point SVG addition
-
-- Custon single point SVG addition
-
-- Action assigned to a circle to display a label
-
-- Damage Control (Visual example only)
-
-### Technicals
-
-- Mathematics
-
-- Quaternions
-
-- Matrices
-
+Most people will not be using these functions.
+|*Functions*|*Description*|
+|--|--|
+|**Manager()**|Creates the manager object|
+|Manager#getLocalToWorldConverter()|Gets the function to convert local coordinates to world coordinates|
+|Manager#getWorldToLocalConverter()|Gets the function to convert world coordinates to local coordinates.|
+|Manager#getTrueWorldPos()|Gets the true world position of 0,0,0 in the construct. Returns x,y,z|
+|Manager#getPlayerLocalPos(playerId)|Gets the local position of any given player ID, if in view. Returns x,y,z|
+|Manager#rotationMatrixToQuaternion(rotM)|Gets the quaternion of a rotation matrix. Returns x,y,z,w|
+|Manager#rotationMatrixToEuler(rotM)|Gets euler angles from a rotation matrix.|
+|Manager#inverse(qX, qY, qZ, qW)|Gets the inverse of a quaternion.|
+|Manager#multiply(ax, ay, az, aw, bx, by, bz, bw)|Multiplies two quaternions together.|
+|Manager#divide(ax, ay, az, aw, bx, by, bz, bw)|Multiplies the inverse of ``b`` quaternion with the ``a`` quaternion to "divide" the ``a`` quaternion by the ``b`` quaternion.|
 # Object
 
 An object represents an independent set of points. An object consists of its rotations, the point around which all the other points rotate and the point groups.
@@ -132,44 +238,6 @@ Custom, however, is unique in that you define the entire draw function yourself.
 There is one additional group called Sub-objects. Sub-objects have their own independent rotation. However, the point around which they rotate is affected by the main object’s rotation. Think how the Earth orbits the sun and the moon orbits the earth. The sun, the super object, will apply the “orbit rotation” to move the orbit of the earth. The earth, however, has its own rotation and thus rotated the moon around it.
 
 I understand that may be a little hard to grasp, and the analogy doesn’t quite hold, but the basic idea is you can essentially have “linked” objects which would allow for far more complex projections.
-
-  
-
-# Object Functions
-
-The object functions are the following:
-
-- setPosition(x,y,z)
-
-- setCircles(gId)
-
--
-
-- setCustom(gId)
-
-- addMultipointSVG()
-
-- addSinglePointSVG()
-
-- setCurves*
-
-- setPolylines(gId)
-
-- rotateHeading(heading)
-
-- rotatePitch(pitch)
-
-- rotateRoll(roll)
-
-### Object Builder
-
-### Setting the Position
-
-### Setting Orientations
-
-### Settings Manipulation
-
-  
 
 # Camera
 
