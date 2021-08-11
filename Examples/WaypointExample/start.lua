@@ -25,7 +25,6 @@ local waypointInfo = {
   {name = "Jago", center = {-94134462,12765534,-3634464}, radius=61590},
   {name = "Lacobus", center = {98865536,-13534464,-934461.99}, radius=55650},
   {name = "Symeon", center = {14165536,-85634465,-934464.3}, radius=49050},
-  {name = "Symeon", center = {14165536,-85634465,-934464.3}, radius=49050},
   {name = "Ion", center = {2865536.7,-99034464,-934462.02}, radius=44950}
 }
 
