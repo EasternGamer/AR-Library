@@ -2,62 +2,34 @@ function getManager()
     local self = {}
     -- Misc function calls
     local solve=library.systemResolution3
-    local gPWP=system.getPlayerWorldPos
-    local sqrt,atan,asin,print=math.sqrt,math.atan,math.asin,system.print
-    --- Core-based function calls
-    local gCWP=core.getConstructWorldPos
-    local gCWOR,gCWOF,gCWOU,gCLOR,gCLOF,gCLOU=core.getConstructWorldOrientationRight,core.getConstructWorldOrientationForward,core.getConstructWorldOrientationUp,core.getConstructOrientationRight,core.getConstructOrientationForward,core.getConstructOrientationUp
-    local gEPBI=core.getElementPositionById
-    local mul,div,inv,rTQ,gTWP,gWTLC,gLTWC=nil,nil,nil,nil,nil,nil,nil
+    local sqrt,atan,asin,acos,print=math.sqrt,math.atan,math.asin,math.acos,system.print
     
-    local hp=core.getMaxHitPoints()
-    local cOff=16
-    if hp>10000 then cOff=128
-    elseif hp>1000 then cOff=64
-    elseif hp>150 then cOff=32
-    end
-    local function correct(v)
-        local lr,lf,lu=gCLOR(),gCLOF(),gCLOU()
-        return solve(lr,lf,lu,v)
-    end
+    --- Core-based function calls
+    local gCWOR,gCWOF,gCWOU,gCLOR,gCLOF,gCLOU,gCWR,gCWF,gCWU=core.getConstructWorldOrientationRight,core.getConstructWorldOrientationForward,core.getConstructWorldOrientationUp,core.getConstructOrientationRight,core.getConstructOrientationForward,core.getConstructOrientationUp,core.getConstructWorldRight,core.getConstructWorldForward,core.getConstructWorldUp
+    local gWTLC,gLTWC=nil,nil
+    
     function self.getLocalToWorldConverter()
         local s=solve
-        local r,f,u=gCWOR(),gCWOF(),gCWOU()
-        return function(c) c=correct(c) return s(s(r,f,u,{1,0,0}),s(r,f,u,{0,1,0}),s(r,f,u,{0,0,1}),c) end
+        local r,f,u=gCWR(),gCWF(),gCWU()
+        local tr = {r[1],f[1],u[1]}
+        local tf = {r[2],f[2],u[2]}
+        local tu = {r[3],f[3],u[3]}
+        return function(c)
+            return s(tr, tf, tu, c)  
+        end
     end
 
     function self.getWorldToLocalConverter()
-        local lr,lf,lu,r,f,u=gCLOR(),gCLOF(),gCLOU(),gCWOR(),gCWOF(),gCWOU()
+        local xM,yM,zM=gCWR(),gCWF(),gCWU()
+        local s = solve
+        return function(w) return solve(xM,yM,zM,w) end
+    end
+    function self.quatToAxisAngle(ax,ay,az,aw)
+        local awaw = 1/sqrt(1-aw*aw)
 
-        local matrix1,matrix2={lr[1],lr[2],lr[3],0,lf[1],lf[2],lf[3],0,lu[1],lu[2],lu[3],0},{r[1],r[2],r[3],0,f[1],f[2],f[3],0,u[1],u[2],u[3],0}
-        
-        local ax,ay,az,aw=inv(rTQ(matrix1))
-        local bx,by,bz,bw=rTQ(matrix2)
-        local wx,wy,wz,ww=mul(ax,ay,az,aw,bx,by,bz,bw)
-        
-        local wxwx,wxwy,wxwz,wxww,wywy,wywz,wyww,wzwz,wzww=wx*wx,wx*wy,wx*wz,wx*ww,wy*wy,wy*wz,wy*ww,wz*wz,wz*ww
-        return function(w) return solve({1-2*(wywy+wzwz),2*(wxwy-wzww),2*(wxwz+wyww)},{2*(wxwy+wzww),1-2*(wxwx+wzwz),2*(wywz-wxww)},{2*(wxwz-wyww),2*(wywz+wxww),1-2*(wxwx+wywy)},w) end
+        return ax*awaw, ay*awaw, az*awaw, 2*acos(aw)
     end
-    function self.getTrueWorldPos()
-        local cal1=gLTWC()
-        local cal2=gWTLC()
-        local cWP=gCWP()
-        local p=gEPBI(1)
-        local offsetPosition={p[1]-cOff,p[2]-cOff,p[3]-cOff}
-        local adj=cal1(offsetPosition)
-        local adjPos={cWP[1]-adj[1],cWP[2]-adj[2],cWP[3]-adj[3]}
-        return adjPos
-    end
-    function self.getPlayerLocalPos(playerId)
-        local c=gWTLC()
-        local cWP=gTWP()
-        local pWP=gPWP(playerId)
-        local adjPos=c({pWP[1]-cWP[1],pWP[2]-cWP[2],pWP[3]-cWP[3]})
-        adjPos={-adjPos[1],adjPos[2],adjPos[3]}
-        return adjPos
-    end
-    function self.rotMatrixToQuat(rM)
-        local m11,m21,m31,m12,m22,m32,m13,m23,m33=rM[1],rM[5],rM[9],rM[2],rM[6],rM[10],rM[3],rM[7],rM[11]
+    local function matrixToQuat(m11,m21,m31,m12,m22,m32,m13,m23,m33)
         local t=m11+m22+m33
         if t>0 then
             local s=0.5/sqrt(t+1)
@@ -73,17 +45,78 @@ function getManager()
             return (m13+m31)/s,(m23+m32)/s,0.25*s,(m21-m12)/s
         end
     end
+    
+    function self.getPlayerLocalRotation()
+        local fwd = unit.getMasterPlayerForward()
+        local right = unit.getMasterPlayerRight()
+        local up = unit.getMasterPlayerUp()
+
+        return matrixToQuat(right[1],right[2],right[3],fwd[1],fwd[2],fwd[3],up[1],up[2],up[3])
+    end
+    
+    
+    function self.rotMatrixToQuat(rM1,rM2,rM3)
+        if rM2 and rM3 then
+            return matrixToQuat(rM1[1],rM1[2],rM1[3],rM2[1],rM2[2],rM2[3],rM3[1],rM3[2],rM3[3])
+        else
+            return matrixToQuat(rM1[1],rM1[5],rM1[9],rM1[2],rM1[6],rM1[10],rM1[3],rM1[7],rM1[11])
+        end
+    end
     function self.inverse(qX,qY,qZ,qW)
-        local mag=qX*qX+qY*qY+qZ*qZ+qW*qW
-        return -qX/mag,-qY/mag,-qZ/mag,qW/mag
+        return -qX,-qY,-qZ,qW
+    end
+    function self.inverseMulti(ax,ay,az,aw,bx,by,bz,bw)
+        local axax,ayay,azaz,awaw=ax*ax,ay*ay,az*az,aw*aw
+        return bx*(awaw-axax-ayay-azaz)+2*aw*(ax*bw+ay*bz-az*by),2*(bx*(aw*az+ax*ay)+bz*(ay*az-aw*ax))+by*(awaw-axax+ayay-azaz),2*(bx*(ax*az-aw*ay)+by*(ax*aw+ay*az))+bz*(awaw-axax-ayay+azaz),bw*(awaw+axax+ayay+azaz)
+    end
+    function self.transPoint3D(ax,ay,az,aw,bx,by,bz)
+        local axax,ayay,azaz,awaw=ax*ax,ay*ay,az*az,aw*aw
+        return 
+        2*(by*(ax*ay-aw*az)+bz*(ax*az+aw*ay))+bx*(awaw+axax-ayay-azaz),
+        2*(bx*(aw*az+ax*ay)+bz*(ay*az-aw*ax))+by*(awaw-axax+ayay-azaz),
+        2*(bx*(ax*az-aw*ay)+by*(ax*aw+ay*az))+bz*(awaw-axax-ayay+azaz)
+    end
+    
+    function self.transPoints3D(ax,ay,az,aw,points)
+        
+        local axax,ayay,azaz,awaw=ax*ax,ay*ay,az*az,aw*aw
+        
+        -- What I derived
+        local a,b,c = (awaw+axax-ayay-azaz), 2*(ax*ay-aw*az), 2*(ax*az+aw*ay)
+        local d,f,e = 2*(aw*az+ax*ay), (awaw-axax+ayay-azaz), 2*(ay*az-aw*ax)
+        local g,h,i = 2*(ax*az-aw*ay), 2*(ax*aw+ay*az), (awaw-axax-ayay+azaz)
+        
+        local pts={}
+        for i=1,#points,3 do
+            local x,y,z=points[i],points[i+1],points[i+2]
+            pts[i]=x*a+y*b+z*c
+            pts[i+1]=x*d+y*e+z*f
+            pts[i+2]=x*g+y*h+z*i
+        end
+        return pts
+    end
+    function self.transPoints2D(ax,ay,az,aw,points)
+        local axax,ayay,azaz,awaw=ax*ax,ay*ay,az*az,aw*aw
+        local b,c=2*(ax*az+aw*ay),(awaw+axax-ayay-azaz)
+        local d,e=2*(aw*az+ax*ay),2*(ay*az-aw*ax)
+        local g,i=2*(ax*az-aw*ay),(awaw-axax-ayay+azaz)
+        local pts={}
+        for i=1,#points,3 do
+            local x,z=points[i],points[i+2]
+            pts[i]=x*c+z*b
+            pts[i+1]=x*d+z*e
+            pts[i+2]=x*g+z*i
+        end
+        return pts
     end
     function self.multiply(ax,ay,az,aw,bx,by,bz,bw)
         return ax*bw+aw*bx+ay*bz-az*by,ay*bw+aw*by+az*bx-ax*bz,az*bw+aw*bz+ax*by-ay*bx,aw*bw-ax*bx-ay*by-az*bz
     end
-    function self.divide(ax,ay,az,aw,bx,by,bz,bw)
-        local cx,cy,cz,cw=inv(bx,by,bz,bw)
-        return mul(ax,ay,az,aw,cx,cy,cz,cw)
+    
+    function self.transPoint2D(ax,ay,az,aw,x,y)
+        local axax,ayay,azaz,awaw=ax*ax,ay*ay,az*az,aw*aw
+        return 2*z*(ax*az+aw*ay)+x*(awaw+axax-ayay-azaz),2*(x*(aw*az+ax*ay)+z*(ay*az-aw*ax)),2*x*(ax*az-aw*ay)+z*(awaw-axax-ayay+azaz)
     end
-    mul,div,inv,rTQ,gTWP,gWTLC,gLTWC=self.multiply,self.divide,self.inverse,self.rotMatrixToQuat,self.getTrueWorldPos,self.getWorldToLocalConverter,self.getLocalToWorldConverter
+    gWTLC,gLTWC=self.getWorldToLocalConverter,self.getLocalToWorldConverter
     return self
 end
