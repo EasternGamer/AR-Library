@@ -1,103 +1,56 @@
-function Projector(core, camera)
+function Projector(camera)
+    local isClicked=false
     -- Localize frequently accessed data
     local utils=require('cpml.utils')
-    local library=library
-    local core=core
-    local unit=unit
-    local system=system
-    local manager=getManager()
+    
+    --local library=library
+    local core,system,manager=core,system,getManager()
     
     -- Localize frequently accessed functions
     --- Library-based function calls
-    local solve=library.systemResolution3
+    --local solve=library.systemResolution3
     
     --- System-based function calls
-    local getWidth=system.getScreenWidth
-    local getHeight=system.getScreenHeight
-    local getFov=system.getFov
-    local getMouseDeltaX=system.getMouseDeltaX
-    local getMouseDeltaY=system.getMouseDeltaY
-    local getPlayerWorldPos=system.getPlayerWorldPos
-    local print=system.print
+    local getWidth,getHeight,getFov,getMouseDeltaX,getMouseDeltaY,print=system.getScreenWidth,system.getScreenHeight,system.getFov,system.getMouseDeltaX,system.getMouseDeltaY,system.print
     
     --- Core-based function calls
-    local getCWorldPos=core.getConstructWorldPos
-    local getCWorldOriR=core.getConstructWorldOrientationRight
-    local getCWorldOriF=core.getConstructWorldOrientationForward
-    local getCWorldOriU=core.getConstructWorldOrientationUp
-    local getCLocalOriR=core.getConstructOrientationRight
-    local getCLocalOriF=core.getConstructOrientationForward
-    local getCLocalOriU=core.getConstructOrientationUp
-    local getElementPositionById=core.getElementPositionById
-    local getElementRotationById=core.getElementRotationById
-    
-    --- Unit-based function calls
-    local getRelativeOrientation=unit.getMasterPlayerRelativeOrientation
+    local getCWorldR,getCWorldF,getCWorldU,getCWorldPos=core.getConstructWorldRight,core.getConstructWorldForward,core.getConstructWorldUp,core.getConstructWorldPos
     
     --- Camera-based function calls
-    local getAlignmentType=camera.getAlignmentType
+    local getCameraLocalPos=system.getCameraPos
+    local getCameraWorldPos=system.getCameraWorldPos
+    local getCamWorldFwd,getCamWorldRight,getCamWorldUp=system.getCameraWorldForward,system.getCameraWorldRight,system.getCameraWorldUp
+    local getCamLocalFwd,getCamLocalRight,getCamLocalUp=system.getCameraForward,system.getCameraRight,system.getCameraUp
     
     --- Manager-based function calls
-    ---- Positional Operations
-    local getLocalToWorldConverter=manager.getLocalToWorldConverter
-    local getWorldToLocalConverter=manager.getWorldToLocalConverter
-    local getTrueWorldPos=manager.getTrueWorldPos
-    local getPlayerLocalPos=manager.getPlayerLocalPos
     ---- Quaternion operations
-    local inverse,multiply,divide,rotToEuler,rotToQuat=manager.inverse,manager.multiply,manager.divide,manager.rotMatrixToEuler,manager.rotMatrixToQuat
+    local t3DP,rotToEuler,rotToQuat=manager.transPoint3D,manager.rotMatrixToEuler,manager.rotMatrixToQuat
     
     -- Localize Math functions
-    local sin,cos,tan,rad,deg,sqrt,atan,ceil,floor=math.sin,math.cos,math.tan,math.rad,math.deg,math.sqrt,math.atan,math.ceil,math.floor
-
+    local maths = math
+    local sin,cos,tan,rad,deg,sqrt,atan,ceil,floor=maths.sin,maths.cos,maths.tan,maths.rad,maths.deg,maths.sqrt,maths.atan,maths.ceil,maths.floor
+    local rnd=utils.round
     -- Projection infomation
     --- Screen Parameters
-    local width = getWidth()*0.5
-    local height = getHeight()*0.5
-
-    --- FOV Paramters
+    local width,height=getWidth()*0.5,getHeight()*0.5
     
-    --local offset = (width + height) / 5000
-    local offset=0
-    local hfovRad=rad(getFov()+offset)
-    local tanFov=tan(hfovRad*0.5)*height/width
+    --- FOV Paramters
+    local vertFov = system.getCameraVerticalFov
+    local tanFov=rad(vertFov())
 
     --- Matrix Subprocessing
-    local aspect=width/height
-    local near=width/tanFov
-    local top=near*tanFov
-    local bottom=-top
-    local left=bottom*aspect
-    local right=top*aspect
-
+    local aspect = width/height
+    local nearDivAspect = width/tanFov
     --- Matrix Paramters
-    local x0=2*near/(right-left)
-    local y0=2*near/(top-bottom)
+    local x0=1/tanFov
+    local y0=x0*aspect
     
-    -- Player-related values
-    local playerId=unit.getMasterPlayerId()
-    local unitId=unit.getId()
-    
-    -- Camera-Related values
-    local eye=camera.position
-    local cOrientation=camera.orientation
-    local cameraType=camera.cType
-    local alignmentType=nil
-    
-    --- Mouse info
-    local sensitivity=1 --export: Sensitivtiy
-    local m=sensitivity*(width*2)*0.00104584100642898+0.00222458611638299
-
-    local bottomLock=false
-    local topLock=false
-    local rightLock=false
-    local leftLock=false
-
     local objectGroups={}
     
     local self={objectGroups=objectGroups}
 
     function self.getSize(size,zDepth,max,min)
-        local pSize=atan(size,zDepth)*(near/aspect)
+        local pSize=atan(size,zDepth)*(nearDivAspect)
         local max=max or pSize
         local min=min or pSize
         if pSize>=max then return max
@@ -105,77 +58,20 @@ function Projector(core, camera)
         else return pSize end
     end
     
-    function self.updateCamera()
-        if cameraType.name~="fGlobal" and cameraType.name~="fLocal" then
-            -- Localize variables
-            local atan=atan
-            
-            eye=getPlayerLocalPos(playerId)
-
-            local deltaMouseX,deltaMouseY=getMouseDeltaX(),getMouseDeltaY()
-            local width=width
-            local deltaPitch=atan(-deltaMouseY,width)*m
-            local deltaHeading=atan(deltaMouseX,width)*m
-        
-            local pPitch=cOrientation[1]
-            local pHeading=cOrientation[2]
-            
-            local alignType=alignmentType
-            if alignType==nil then alignType=getAlignmentType() end
-            
-            local pitPos,pitNeg=alignType.pitchPos,alignType.pitchNeg
-            local headPos,headNeg=alignType.headingPos,alignType.headingNeg
-            
-            if pitPos~=nil then
-                if not(bottomLock or topLock) then  
-                    pPitch=pPitch+deltaPitch
-                    if pPitch<=pitNeg then
-                        pPitch=pitNeg
-                        bottomLock=true
-                    end
-                    if pPitch>=pitPos then
-                        pPitch=pitPos
-                        topLock=true
-                    end
-                else
-                    if bottomLock and deltaMouseY<0 then
-                        bottomLock=false
-                        pPitch=pPitch+deltaPitch
-                    end
-                    if topLock and deltaMouseY>0 then
-                        topLock=false
-                        pPitch=pPitch+deltaPitch
-                    end
-                end
-                cOrientation[1]=pPitch
-            else
-                cOrientation[1]=0
-            end
-            if headPos ~= nil then
-                if not(leftLock or rightLock) then  
-                    pHeading=pHeading+deltaHeading
-                    if pHeading<=headNeg then
-                        pHeading=headNeg
-                        leftLock=true
-                    end
-                    if pHeading>=headPos then
-                        pHeading=headPos
-                        rightLock=true
-                    end
-                else
-                    if rightLock and deltaMouseX<0 then
-                        rightLock=false
-                        pHeading=pHeading+deltaHeading
-                    end
-                    if leftLock and deltaMouseX>0 then
-                        leftLock=false
-                        pHeading=pHeading+deltaHeading
-                    end
-                end
-                cOrientation[2]=pHeading
-            else
-                cOrientation[2]=0
-            end
+    local function matrixToQuat(m11,m21,m31,m12,m22,m32,m13,m23,m33)
+        local t=m11+m22+m33
+        if t>0 then
+            local s=0.5/sqrt(t+1)
+            return (m32-m23)*s,(m13-m31)*s,(m21-m12)*s,0.25/s
+        elseif m11>m22 and m11>m33 then
+            local s = 2*sqrt(1+m11-m22-m33)
+            return 0.25*s,(m12+m21)/s,(m13+m31)/s,(m32-m23)/s
+        elseif m22>m33 then
+            local s=2*sqrt(1+m22-m11-m33)
+            return (m12+m21)/s,0.25*s,(m23+m32)/s,(m13-m31)/s
+        else
+            local s=2*sqrt(1+m33-m11- m22)
+            return (m13+m31)/s,(m23+m32)/s,0.25*s,(m21-m12)/s
         end
     end
 
@@ -189,574 +85,272 @@ function Projector(core, camera)
     	objectGroups[id]={}
     end
     
-    local sx,sy,sz,sw = 0,0,0,1
-    local lx,ly,lz,lw = 0,0,0,1
-    local cUX,cUY,cUZ = nil,nil,nil
-    local cFX,cFY,cFZ = nil,nil,nil
-    local cRX,cRY,cRZ = nil,nil,nil
+    local cUX,cUY,cUZ,cFX,cFY,cFZ,cRX,cRY,cRZ,sx,sy,sz,sw = nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil,nil
     
     function self.getModelMatrices(mObject)
-        local s,c,multi,inverse=sin,cos,multiply,inverse
+        local s,c=sin,cos
         local modelMatrices={}
             
         -- Localize Object values.
-        local obj=mObject
-        local objOri=obj[9]
-        local objPos=obj[11]
+        local objOri,objPos=mObject[10],mObject[12]
         local objPosX,objPosY,objPosZ=objPos[1],objPos[2],objPos[3]
         
-        local cUX,cUY,cUZ=cUX,cUY,cUZ
-        local cFX,cFY,cFZ=cFX,cFY,cFZ
-        local cRX,cRY,cRZ=cRX,cRY,cRZ
-        local sx,sy,sz,sw=sx,sy,sz,sw
+        local cRX,cRY,cRZ,cFX,cFY,cFZ,cUX,cUY,cUZ,sx,sy,sz,sw=cRX,cRY,cRZ,cFX,cFY,cFZ,cUX,cUY,cUZ,-sx,-sy,-sz,sw
         
-        local recurse={}
         local ct=2
-        function recurse.subObjectMatrices(kx,ky,kz,kw,sObjX,sObjY,sObjZ,object,posLX,posLY,posLZ)
-            local objPos=object[11]
-            local objRot=object[9]
+        local function subObjectMatrices(kx,ky,kz,kw,sObjX,sObjY,sObjZ,object,posLX,posLY,posLZ)
+            local kx,ky,kz,kw=kx,ky,kz,-kw
+            local objPos,objRot=object[12],object[10]
             local objX,objY,objZ=objPos[1],objPos[2],objPos[3]
             
-            local objP,objH,objR=objRot[1]*0.5,objRot[2]*0.5,objRot[3]*0.5
-            local sP,sH,sR=s(objP),s(objR),s(objH)
-            local cP,cH,cR=c(objP),c(objR),c(objH)
-    
-            local wwx,wwy,wwz,www=sP*cH*cR-cP*sH*sR,cP*sH*cR+sP*cH*sR,cP*cH*sR-sP*sH*cR,cP*cH*cR+sP*sH*sR
+            local wwx,wwy,wwz,www=objRot[1],objRot[2],objRot[3],objRot[4]
             local wx,wy,wz,ww=wwx,wwy,wwz,www
 
-            local lix,liy,liz,liw=inverse(kx,ky,kz,kw)
-            
-            local posTX,posTY,posTZ,posTW=multi(kx,ky,kz,kw,objX,objY,objZ,0)
-
-            local posIX=-posTX*liw+posTW*lix-posTY*liz-posTZ*liy
-            local posIY=posTY*liw+posTW*liy+posTZ*lix-posTX*liz
-            local posIZ=-posTZ*liw+posTW*liz+posTX*liy+posTY*lix
-            if object[7]==2 then
-                local dotX=cRX*posIX+cFX*posIY+cUX*posIZ
-                local dotY=cRY*posIX+cFY*posIY+cUY*posIZ
-                local dotZ=cRZ*posIX+cFZ*posIY+cUZ*posIZ
-                posIX=dotX
-                posIY=dotY
-                posIZ=dotZ
+            local posIX,posIY,posIZ=t3DP(kx,ky,kz,kw,objX,objY,objZ)
+			
+            if object[9]==2 then
+                local mx,my,mz,mw=wx*sw+ww*sx+wy*sz-wz*sy, wy*sw+ww*sy+wz*sx-wx*sz, wz*sw+ww*sz+wx*sy-wy*sx, ww*sw-wx*sx-wy*sy-wz*sz
+			 wx,wy,wz,ww=mx, my, mz, mw
             end
-            posIX,posIY,posIZ=posIX+posLX,posIY+posLY,posIZ+posLZ
+			
+			local matrix = {
+                    1-2*(wywy+wzwz),2*(wx*wy+wz*ww),2*(wx*wz-wy*ww),0,
+                    2*(wx*wy-wz*ww),1-2*(wxwx+wzwz),2*(wy*wz+wx*ww),0,
+                    2*(wx*wz+wy*ww),2*(wy*wz-wx*ww),1-2*(wxwx+wywy),0
+                }
+				
             if object[8]==2 then
-                wx,wy,wz,ww=multi(wx,wy,wz,ww,sx,sy,sz,sw)
+                matrix[4]=cRX*posIX+cFX*posIY+cUX*posIZ+posLX
+                matrix[8]=cRY*posIX+cFY*posIY+cUY*posIZ+posLY
+                matrix[12]=cRZ*posIX+cFZ*posIY+cUZ*posIZ+posLZ
             end
             
-            local wxwx,wxwy,wxwz,wxww,wywy,wywz,wyww,wzwz,wzww=wx*wx,wx*wy,wx*wz,wx*ww,wy*wy,wy*wz,wy*ww,wz*wz,wz*ww
-            local a1 = 1-2*(wywy+wzwz)
-            local b1 = 2*(wxwy-wzww)
-            local c1 = 2*(wxwz+wyww)
-    
-            local d1 = 2*(wxwy+wzww)
-            local e1 = 1-2*(wxwx+wzwz)
-            local f1 = 2*(wywz-wxww)
-    
-            local g1 = 2*(wxwz-wyww)
-            local h1 = 2*(wywz+wxww)
-            local i1 = 1-2*(wxwx+wywy)
-            
-            modelMatrices[ct]={object,{a1,-d1,-g1,posIX,-b1,e1,h1,-posIY,-c1,f1,i1,-posIZ,0,0,0,1}}
+            modelMatrices[ct]={object,matrix}
             ct=ct+1
             
-            local subObjects=object[6]
+            local subObjects=object[7]
             if #subObjects>0 then
                 for k=1,#subObjects do
                     local subObj=subObjects[k]
-                    if subObj[11]~=nil then
-                        recurse.subObjectMatrices(wwx,wwy,wwz,www,objX,objY,objZ,subObj,posIX,posIY,posIZ)
+                    if subObj[12]~=nil then
+                        subObjectMatrices(wwx,wwy,wwz,www,objX,objY,objZ,subObj,matrix[4],matrix[8],matrix[12])
                     end
                 end
             end
         end
-        local pitch,heading,roll=objOri[1]*0.5,objOri[2]*0.5,objOri[3]*0.5
+        local wwx,wwy,wwz,www=objOri[1],objOri[2],objOri[3],objOri[4]
         
-        --- Quaternion of object rotations
-        local sP,sH,sR=s(pitch),s(roll),s(heading)
-        local cP,cH,cR=c(pitch),c(roll),c(heading)
-    
-        local wwx=(sP*cH*cR-cP*sH*sR)
-        local wwy=(cP*sH*cR+sP*cH*sR)
-        local wwz=(cP*cH*sR-sP*sH*cR)
-        local www=(cP*cH*cR+sP*sH*sR)
         local wx,wy,wz,ww=wwx,wwy,wwz,www
-        
-        if obj[8]==2 then
-            wx,wy,wz,ww=multiply(wx,wy,wz,ww,sx,sy,sz,sw)
+        if mObject[9]==2 then
+            local mx,my,mz,mw=wx*sw+ww*sx+wy*sz-wz*sy, wy*sw+ww*sy+wz*sx-wx*sz, wz*sw+ww*sz+wx*sy-wy*sx, ww*sw-wx*sx-wy*sy-wz*sz
+            wx,wy,wz,ww=mx,my,mz,mw
         end
-        
-        local wxwx,wxwy,wxwz,wxww,wywy,wywz,wyww,wzwz,wzww=wx*wx,wx*wy,wx*wz,wx*ww,wy*wy,wy*wz,wy*ww,wz*wz,wz*ww
-        local a2=1-2*(wywy+wzwz)
-        local b2=2*(wxwy-wzww)
-        local c2=2*(wxwz+wyww)
-    
-        local d2=2*(wxwy+wzww)
-        local e2=1-2*(wxwx+wzwz)
-        local f2=2*(wywz-wxww)
-    
-        local g2=2*(wxwz-wyww)
-        local h2=2*(wywz+wxww)
-        local i2=1-2*(wxwx+wywy)
-
-        if obj[7]==2 then
-            local dotX=cRX*objPosX+cFX*objPosY+cUX*objPosZ
-            local dotY=cRY*objPosX+cFY*objPosY+cUY*objPosZ
-            local dotZ=cRZ*objPosX+cFZ*objPosY+cUZ*objPosZ
-            objPosX=dotX
-            objPosY=dotY
-            objPosZ=dotZ
+        local matrix = {
+            wx,wy,wz,ww,
+            0,0,0
+        }
+        if mObject[8]==2 then
+            matrix[5],matrix[6],matrix[7]=cRX*objPosX+cFX*objPosY+cUX*objPosZ,cRY*objPosX+cFY*objPosY+cUY*objPosZ,cRZ*objPosX+cFZ*objPosY+cUZ*objPosZ
+            matrix[8],matrix[9],matrix[10]=objPosX,objPosY,objPosZ
         else
-            local cWorldPos=getTrueWorldPos()
-            objPosX=objPosX-cWorldPos[1]
-            objPosY=objPosY-cWorldPos[2]
-            objPosZ=objPosZ-cWorldPos[3]
+            local cWorldPos=getCWorldPos()
+            local oPX,oPY,oPZ = objPosX-cWorldPos[1],objPosY-cWorldPos[2],objPosZ-cWorldPos[3]
+            matrix[5],matrix[6],matrix[7]=oPX,oPY,oPZ
+            matrix[8],matrix[9],matrix[10]=cRX*oPX+cRY*oPY+cRZ*oPZ,
+                                           cFX*oPX+cFY*oPY+cFZ*oPZ,
+                                           cUX*oPX+cUY*oPY+cUZ*oPZ
         end
-        local subObjs=obj[6]
+        modelMatrices[1]={mObject,matrix}
+        local subObjs=mObject[7]
         if #subObjs>0 then
             for k=1,#subObjs do
                 local subObj=subObjs[k]
-                if subObj[6]~= nil then
-                    recurse.subObjectMatrices(wwx,wwy,wwz,www,objPos[1],objPos[2],objPos[3],subObj,objPosX,objPosY,objPosZ)
+                if subObj[7]~= nil then
+                    subObjectMatrices(wwx,wwy,wwz,www,objPos[1],objPos[2],objPos[3],subObj,matrix[4],matrix[8],matrix[12])
                 end
             end
         end
-        modelMatrices[1]={obj,{a2,-d2,-g2,objPosX,-b2,e2,h2,-objPosY,-c2,f2,i2,-objPosZ,0,0,0,1}}
+
         return modelMatrices
     end
 
     local function updateReferentials()
-        local s = solve
-        local cU,cF,cR = getCWorldOriU(),getCWorldOriF(),getCWorldOriR()
-        local ccUX,ccUY,ccUZ,ccFX,ccFY,ccFZ,ccRX,ccRY,ccRZ=cU[1],cU[2],cU[3],cF[1],cF[2],cF[3],cR[1],cR[2],cR[3]
-        local v1t,v2t,v3t=s(cR,cF,cU,{1,0,0}),s(cR,cF,cU,{0,1,0}),s(cR,cF,cU,{0,0,1})
-        cRX,cRY,cRZ,cFX,cFY,cFZ,cUX,cUY,cUZ=ccRX,ccRY,ccRZ,ccFX,ccFY,ccFZ,ccUX,ccUY,ccUZ
-        sx,sy,sz,sw=rotToQuat({ccRX,ccRY,ccRZ,0,ccFX,ccFY,ccFZ,0,ccUX,ccUY,ccUZ,0})
-        lx,ly,lz,lw=rotToQuat({v1t[1],v1t[2],v1t[3],0,v2t[1],v2t[2],v2t[3],0,v3t[1],v3t[2],v3t[3],0})
+        local cU,cF,cR = getCWorldU(),getCWorldF(),getCWorldR()
+
+        cRX,cRY,cRZ,cFX,cFY,cFZ,cUX,cUY,cUZ=cR[1],cR[2],cR[3],cF[1],cF[2],cF[3],cU[1],cU[2],cU[3]
+        sx,sy,sz,sw=matrixToQuat(cRX,cRY,cRZ,cFX,cFY,cFZ,cUX,cUY,cUZ)
     end
     
     function self.getViewMatrix()
         updateReferentials()
-        local s,c,multi,solve=sin,cos,multiply,solve
-
-        local board=getElementRotationById(unitId)
-        local ax,ay,az,aw=board[1],board[2],board[3],board[4]
+        local id=camera.cType.id
+        local fG,fL=id==0,id==1
         
-        local body=getRelativeOrientation()
-        local bx,by,bz,bw=body[1],body[2],body[3],body[4]
-        
-        local sx,sy,sz,sw=lx,ly,lz,lw
-
-        local eye=eye
-        local eyeX,eyeY,eyeZ=eye[1],eye[2],eye[3]
-
-        local dotX,dotY,dotZ=eyeX,eyeY,eyeZ
-        local wx,wy,wz,ww=0,0,0,1
-        
-        local px,py,pz,pw=multi(ax,ay,az,aw,bx,by,bz,bw)
-        local alignment=getAlignmentType(px,py,pz,pw,eyeX,eyeY,eyeZ)
-        alignmentType=alignment
-        local pix,piy,piz,piw=inverse(px,py,pz,pw)
-        local shift=alignment.shift
+        if fG or fL then -- To do and fix
+            local s,c=sin,cos
+            local cOrientation = camera.orientation
+            local pitch,heading,roll=cOrientation[1]*0.5,-cOrientation[2]*0.5,cOrientation[3]*0.5
+            local sP,sR,sH=s(pitch),s(heading),s(roll)
+            local cP,cR,cH=c(pitch),c(heading),c(roll)
             
-        local eyeTX,eyeTY,eyeTZ,eyeTW=multi(px,py,pz,pw,shift[1],shift[2],shift[3],0)
-        local eyeIX,eyeIY,eyeIZ,eyeIW=multi(eyeTX,eyeTY,eyeTZ,eyeTW,pix,piy,piz,piw)
-        
-        local alignName=alignment.name
-        local nFG=alignName~="fGlobal"
-        local fG=alignName=="fGlobal"
-        local nFL=alignName~="fLocal"
-        local fL=alignName=="fLocal"
-        local ori=cOrientation
-        local pitch,roll,heading=ori[1]*0.5,0,ori[2]*0.5
-        if pitch~=0 or heading~=0 or roll~=0 or fG or fL then
-            local sP,sH,sR=s(pitch),s(roll),s(heading)
-            local cP,cH,cR=c(pitch),c(roll),c(heading)
+            local cx,cy,cz,cw=sP*cR,sP*sR,cP*sR,cP*cR
+            if fG then 
+                wx,wy,wz,ww=cx,cy,cz,cw
+            else
+                local mx,my,mz,mw=sx*cw+sw*cx+sy*cz-sz*cy,sy*cw+sw*cy+sz*cx-sx*cz,sz*cw+sw*cz+sx*cy-sy*cx,sw*cw-sx*cx-sy*cy-sz*cz
+                wx,wy,wz,ww=mx,my,mz,mw
+            end
+        else
             
-            local cx=sP*cH*cR-cP*sH*sR
-            local cy=-cP*sH*cR-sP*cH*sR
-            local cz=-cP*cH*sR+sP*sH*cR
-            local cw=cP*cH*cR+sP*sH*sR
-            if nFG and nFL then px,py,pz,pw=multi(px,py,pz,pw,cx,cy,cz,cw)
-            elseif alignName=="fGlobal" then wx,wy,wz,ww=cx,cy,cz,cw
-            else wx,wy,wz,ww = multi(sx,sy,sz,sw,cx,cy,cz,cw) end
+            local lEye = getCameraLocalPos()
+            local lEyeX,lEyeY,lEyeZ = lEye[1],lEye[2],lEye[3]
+            local lf,lr,lu,gf,gr,gu = getCamLocalFwd(),getCamLocalRight(),getCamLocalUp(),getCamWorldFwd(),getCamWorldRight(),getCamWorldUp()
+            local lfx,lfy,lfz = lf[1],lf[2],lf[3]
+            
+            local dotX=lr[1]*lEyeX+lr[2]*lEyeY+lr[3]*lEyeZ
+            local dotY=lfx*lEyeX+lfy*lEyeY+lfz*lEyeZ
+            local dotZ=lu[1]*lEyeX+lu[2]*lEyeY+lu[3]*lEyeZ
+		  
+            return gr[1],gr[2],gr[3],gf[1],gf[2],gf[3],gu[1],gu[2],gu[3],-dotX,-dotY,-dotZ,lEyeX,lEyeY,lEyeZ,lfx,lfy,lfz
         end
-        
-        if nFG and nFL then
-            local pxpx,pxpy,pxpz,pxpw,pypy,pypz,pypw,pzpz,pzpw=px*px,px*py,px*pz,px*pw,py*py,py*pz,py*pw,pz*pz,pz*pw
-            local a1=1-2*(pypy+pzpz)
-            local b1=2*(pxpy-pzpw)
-            local c1=2*(pxpz+pypw)
-    
-            local d1=2*(pxpy+pzpw)
-            local e1=1-2*(pxpx+pzpz)
-            local f1=2*(pypz-pxpw)
-    
-            local g1=2*(pxpz-pypw)
-            local h1=2*(pypz+pxpw)
-            local i1=1-2*(pxpx+pypy)
-            eyeX=eyeX-eyeIX
-            eyeY=eyeY+eyeIY
-            eyeZ=eyeZ+eyeIZ
-        
-            dotX=a1*eyeX+-d1*eyeY+-g1*eyeZ
-            dotY=-b1*eyeX+e1*eyeY+h1*eyeZ
-            dotZ=-c1*eyeX+f1*eyeY+i1*eyeZ
-            wx,wy,wz,ww=multi(sx,sy,sz,sw,px,py,pz,pw)
-        end
-        -- Camera rotation determination
-        --- Directly input euler angles in radians
-        
-        local wxwx,wxwy,wxwz,wxww,wywy,wywz,wyww,wzwz,wzww=wx*wx,wx*wy,wx*wz,wx*ww,wy*wy,wy*wz,wy*ww,wz*wz,wz*ww
-        local a2=1-2*(wywy+wzwz)
-        local b2=2*(wxwy-wzww)
-        local c2=2*(wxwz+wyww)
-    
-        local d2=2*(wxwy+wzww)
-        local e2=1-2*(wxwx+wzwz)
-        local f2=2*(wywz-wxww)
-    
-        local g2=2*(wxwz-wyww)
-        local h2=2*(wywz+wxww)
-        local i2=1-2*(wxwx+wywy)
-
-        return {a2,-d2,-g2,dotX,-b2,e2,h2,dotY,-c2,f2,i2,dotZ,0,0,0,1}
     end
     
-    function self.getSVG()
-        local svg={}
-        local c=1
-        local view=self.getViewMatrix()
+    function self.getSVG(isvg, fc)
+        local fullSVG=isvg or {}
+        local fc = fc or 1
+        
+        local vx1,vy1,vz1,
+              vx2,vy2,vz2,
+              vx3,vy3,vz3,vw1,vw2,vw3,lCX,lCY,lCZ,VX,VY,VZ=self.getViewMatrix()
+        local vx,vy,vz,vw = matrixToQuat(vx1,vy1,vz1,vx2,vy2,vz2,vx3,vy3,vz3)
+        
+        local atan,sort,format,unpack,concat,abs,getModelMatrices=atan,table.sort,string.format,table.unpack,table.concat,math.abs,self.getModelMatrices
 
-        local vx1,vy1,vz1,vw1=view[1],view[2],view[3],view[4]
-        local vx2,vy2,vz2,vw2=view[5],view[6],view[7],view[8]
-        local vx3,vy3,vz3,vw3=view[9],view[10],view[11],view[12]
-        
-        local getSize,sort=self.getSize,table.sort
-        
-        local function trigSort(t1,t2)
+        local function zSort(t1,t2)
             return t1[1]>t2[1]
         end
 
-        local function createLabel(svg,c,x,y,text,size,opacity,fill)
-            svg[c]='<text x="'
-            svg[c+1]=x
-            svg[c+2]='" y="'
-            svg[c+3]=y
-            c=c+4
-            if opacity then
-                svg[c]='" fill-opacity="'
-                svg[c+1]=opacity
-                svg[c+2]='" stroke-opacity="'
-                svg[c+3]=opacity
-                c=c+4
-            end
-            if fill then
-                svg[c]='" fill="'
-                svg[c+1]=fill
-                c=c+2
-            end
-            if size then
-                svg[c]='" font-size="'
-                svg[c+1]=size
-                c=c+2
-            end
-            
-            svg[c]='">'
-            svg[c+1]=text
-            svg[c+2]='</text>'
-            return c+3
-        end
+        local tanFov=rad(vertFov())
+        --- Matrix Subprocessing
+        local nearDivAspect = width/tanFov
         -- Localize projection matrix values
-        local px1=x0
-        local pz3=y0
+        local px1=1/tanFov
+        local pz3=px1*aspect
         
         -- Localize screen info
         local width=width
         local height=height
-
+        local nxB,pxB,nyB,pyB=-width*2,width*2,-height*2,height*2
+        local dptPercision = 1
         local objectGroups=objectGroups
+        local svgBuffer = {}
+        local alpha = 1
         for i = 1, #objectGroups do
+            
             local objectGroup=objectGroups[i]
             if objectGroup.enabled==false then goto not_enabled end
+            
             local objGTransX=objectGroup.transX or width
             local objGTransY=objectGroup.transY or height
             local objects=objectGroup.objects
             
-            svg[c]=[[<svg viewBox="0 0 ]]
-            svg[c+1]=width*2
-            svg[c+2]=[[ ]]
-            svg[c+3]=height*2
-            svg[c+4]=[[" class="]]
-            svg[c+5]=objectGroup.style
-            svg[c+6]='"><g transform="translate('
-            svg[c+7]=objGTransX
-            svg[c+8]=','
-            svg[c+9]=objGTransY
-            svg[c+10]=')">'
-            c=c+11
+            local svg = {format('<svg viewbox="-%g -%g %g %g" class="%s">',objGTransX,objGTransY,width*2,height*2,objectGroup.style)}
+            svg[2] = [[
+            <style> 
+            .MainUI {
+            stroke-width: 3; 
+            fill: none;
+            }
+            /*path{ stroke:currentColor; fill:currentColor; stroke-width:1 }*/
+            </style>]]
+            local c = 3
+            --local defs = obj[16]
+            --local defSize = #defs
+            --if defSize > 0 then
+                --svg[c] = '<defs>'
+                --for d=1, defSize do
+                    --svg[c+d] = defs[d]
+                --end
+                --svg[c+defSize+1] = '</defs>'
+                --c = c + defSize + 2
+            --end
+            
+            
+            local avgZ,avgZC = 0,0
             for m=1,#objects do
                 local obj=objects[m]
-                if obj[11]==nil then goto is_nil end
-                local models=self.getModelMatrices(obj)
-                -- Localize model matrix values
+                if obj[12]==nil then goto is_nil end
+                
+                
+                local models=getModelMatrices(obj)
+                
                 for k=1,#models do
                     local modelObj=models[k]
                     local object=modelObj[1]
                     local model=modelObj[2]
                     
-                    local objStyle=object[10]
-                    local objTransX=object[13] or 0
-                    local objTransY=object[14] or 0
+                    local objStyle=object[11]
+                    local objTransX=object[14] or 0
+                    local objTransY=object[15] or 0
                     
-                    svg[c]='<g class="'
-                    svg[c+1]=objStyle
-                    c=c+2
-                    if objTransX~=0 or objTransY~=0 then
-                        svg[c]='" transform="translate('
-                        svg[c+1]=objTransX
-                        svg[c+2]=','
-                        svg[c+3]=objTransY
-                        svg[c+4]=')'
-                        c=c+5
-                    end
-                    svg[c]='">'
+                    svg[c]=format('<g class="%s">',objStyle)
                     c=c+1
-                    local mx1,my1,mz1,mw1=model[1],model[2],model[3],model[4]
-                    local mx2,my2,mz2,mw2=model[5],model[6],model[7],model[8]
-                    local mx3,my3,mz3,mw3=model[9],model[10],model[11],model[12]
-                
-                    local pxw = px1*width            
-                    local mXX=(vx1*mx1+vy1*mx2+vz1*mx3)*pxw
-                    local mXY=(vx1*my1+vy1*my2+vz1*my3)*pxw
-                    local mXZ=(vx1*mz1+vy1*mz2+vz1*mz3)*pxw
-                    local mXW=(vw1+vx1*mw1+vy1*mw2+vz1*mw3)*pxw
-        
-                    local mYX=(vx2*mx1+vy2*mx2+vz2*mx3)
-                    local mYY=(vx2*my1+vy2*my2+vz2*my3)
-                    local mYZ=(vx2*mz1+vy2*mz2+vz2*mz3)
-                    local mYW=(vw2+vx2*mw1+vy2*mw2+vz2*mw3)
-        
-                    local pzw=pz3*height
-                    local mZX=(vx3*mx1+vy3*mx2+vz3*mx3)*pzw
-                    local mZY=(vx3*my1+vy3*my2+vz3*my3)*pzw
-                    local mZZ=(vx3*mz1+vy3*mz2+vz3*mz3)*pzw
-                    local mZW=(vw3+vx3*mw1+vy3*mw2+vz3*mw3)*pzw
-                
-                    local polylineGroups,circleGroups,curvesGroups,customGroups,triangleGroups=object[1],object[2],object[3],object[4],object[5]            
-            
+                    
+                    local mx,my,mz,mw,mw1,mw2,mw3,mXP,mYP,mZP=unpack(model)
+                    
+                    local vMX,vMY,vMZ,vMW = mx*vw+mw*vx+my*vz-mz*vy,
+                                            my*vw+mw*vy+mz*vx-mx*vz,
+                                            mz*vw+mw*vz+mx*vy-my*vx,
+                                            mw*vw-mx*vx-my*vy-mz*vz
+                    
+                    local vMXvMX,vMYvMY,vMZvMZ=vMX*vMX,vMY*vMY,vMZ*vMZ
+
+                    local pxw=px1*width
+                    local pzw=-pz3*height
+                    local mXX,mXY,mXZ,mXW = (1-2*(vMYvMY+vMZvMZ))*pxw,
+                                            2*(vMX*vMY+vMZ*vMW)*pxw,
+                                            2*(vMX*vMZ-vMY*vMW)*pxw,
+                                           (vw1+vx1*mw1+vy1*mw2+vz1*mw3)*pxw
+                    
+                    local mYX,mYY,mYZ,mYW = 2*(vMX*vMY-vMZ*vMW),
+                                            1-2*(vMXvMX+vMZvMZ),
+                                            2*(vMY*vMZ+vMX*vMW),
+                                           (vw2+vx2*mw1+vy2*mw2+vz2*mw3)
+                    
+                    local mZX,mZY,mZZ,mZW = 2*(vMX*vMZ+vMY*vMW)*pzw,
+                                            2*(vMY*vMZ-vMX*vMW)*pzw,
+                                           (1-2*(vMXvMX+vMYvMY))*pzw,
+                                           (vw3+vx3*mw1+vy3*mw2+vz3*mw3)*pzw
+
+                    avgZ = avgZ + mYW
+                    avgZC = avgZC + 1
+
+                    local P0XD,P0YD,P0ZD=lCX-mXP,lCY-mYP,lCZ-mZP
+                    
+                    --system.print(format('P0D: %.2f,%.2f,%.2f', P0XD, P0YD, P0ZD))
+                    local customGroups,uiGroups=object[4],object[6]
                     -- Polylines for-loop
-                    for d=1,#polylineGroups do
-                        local polylineGroup = polylineGroups[d]
-                        svg[c]='<path class="'
-                        svg[c+1]=polylineGroup[1]
-                        svg[c+2]='" d="'
-                        c=c+3
-                        for f=2,#polylineGroup do
-                            local line=polylineGroup[f]
-                            svg[c]='M '
-                            local lC=0
-                            local sP={}
-                            local eP={}
-                            c=c+1
-                            for h=1,#line do
-                                local p=line[h]
-                                local x,y,z=p[1],-p[2],-p[3]
-                                local pz=mYX*x+mYY*y+mYZ*z+mYW
-                                if pz>0 then goto behindLine end
-
-                                local ww=-pz
-                                local wx=(mXX*x+mXY*y+mXZ*z+mXW)/ww
-                                local wy=(mZX*x+mZY*y+mZZ*z+mZW)/ww
-                                if lC~=0 then
-                                    svg[c]=' L '
-                                    c=c+1
-                                    eP={wx,wy}
-                                else
-                                    sP={wx,wy}
-                                end
-                                svg[c]=wx
-                                svg[c+1]=' '
-                                svg[c+2]=wy
-                                c=c+3
-                                lC=lC+1
-                                ::behindLine::
-                            end
-                            if lC < 2 then
-                                if lC == 1 then c=c-4
-                                else c=c-1 end
-                            else
-                                if eP[1]==sP[1] and eP[2]==sP[2] then
-                                    svg[c-4]=' Z '
-                                    c=c-3
-                                end
-                            end
-                        end
-                        svg[c] = '"/>'
-                        c=c+1
-                    end
-                    for cG=1,#circleGroups do
-                        local circleGroup=circleGroups[cG]
-                        svg[c]='<g class="'
-                        svg[c+1]=circleGroup[1]
-                        svg[c+2]='">'
-                        c=c+3
-                        for l=2,#circleGroup do
-                            local cir=circleGroup[l]
-                            local p=cir[1]
-                            local x,y,z=p[1],-p[2],-p[3]
-                            local pz=mYX*x+mYY*y+mYZ*z+mYW
-                            if pz>0 then goto behindCircle end
-
-                            local ww=-pz
-                            local wx=(mXX*x+mXY*y+mXZ*z+mXW)/ww
-                            local wy=(mZX*x+mZY*y+mZZ*z+mZW)/ww
-                            local radius,fill,label,offX,offY,size,resize,action=cir[2],cir[3],cir[4],cir[5],cir[6],cir[7],cir[8],cir[9]
-                            svg[c]='<circle cx="'
-                            svg[c+1]=wx
-                            svg[c+2]='" cy="'
-                            svg[c+3]=wy
-                            svg[c+4]='" r="'
-                            svg[c+5]=radius
-                            svg[c+6]='" fill="'
-                            svg[c+7]=fill
-                            svg[c+8]='"/>'
-                            c=c+9
-                            if label then
-                                svg[c]='<text x="'
-                                svg[c+1]=wx+offX
-                                svg[c+2]='" y="'
-                                svg[c+3]=wy+offY
-                                c=c+4
-                                if size then
-                                    if resize==true then
-                                        svg[c]='" font-size="'
-                                        svg[c+1]=getSize(size, wz)
-                                    else
-                                        svg[c]='" font-size="'
-                                        svg[c+1]=size
-                                    end
-                                    c=c+2
-                                end
-                                svg[c]='">'
-                                svg[c+1]=label
-                                svg[c+2]='</text>'
-                                c=c+3
-                                end
-                            if action then
-                                c=action(svg, c, object, wx, wy, wz)
-                            end
-                            ::behindCircle::
-                        end
-                        svg[c]='</g>'
-                        c=c+1
-                    end
-                    for cuG=1,#curvesGroups do
-                        local curveG=curvesGroups[cuG]
-                        svg[c]='<g class="'
-                        svg[c+1]=curveG[1]
-                        svg[c+2]='">'
-                        c=c+3
-                        local curveG=curvesGroups[cuG]
-                        svg[c]='<path d="'
-                        c=c+1
-                        local curves=curveG[2]
-                        local sLabelDat={}
-                        local sLDC=0
-                        for cCt=1,#curves do
-                            local curve=curves[cCt]
-                            if curve[1]==1 then
-                                local pts=curve[2]
-                                local labelDat=curve[3]
-                                local tPts={}
-                                for i=1,12 do
-                                    local p=pts[i]
-                                    local x,y,z=p[1],-p[2],-p[3]
-                                    local pz=mYX*x+mYY*y+mYZ*z+mYW
-                                    if pz>0 then tPts[i]={0,0,false}; goto continueCurve end
-                                    
-                                    local ww=-pz
-                                    tPts[i]={(mXX*x+mXY*y+mXZ*z+mXW)/ww,(mZX*x+mZY*y+mZZ*z+mZW)/ww,true}
-                                    ::continueCurve::
-                                end
-                                local m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12=tPts[1],tPts[2],tPts[3],tPts[4],tPts[5],tPts[6],tPts[7],tPts[8],tPts[9],tPts[10],tPts[11],tPts[12]
-                                local m1x,m1y,m1z,m2x,m2y,m3x,m3y,m4x,m4y,m4z=m1[1],m1[2],m1[3],m2[1],m2[2],m3[1],m3[2],m4[1],m4[2],m4[3]
-                                if m1[3] and m1[3] and m1[3] and m4z then
-                                    svg[c]='M';svg[c+1]=m1x;svg[c+2]=' ';svg[c+3]=m1y;svg[c+4]='C';svg[c+5]=m2x;svg[c+6]=' ';svg[c+7]=m2y;svg[c+8]=',';svg[c+9]=m3x;svg[c+10]=' ';svg[c+11]=m3y;svg[c+12]=',';svg[c+13]=m4x;svg[c+14]=' ';svg[c+15]=m4y
-                                    c=c+16
-                                end
-                                local m5x,m5y,m6x,m6y,m7x,m7y,m7z=m5[1],m5[2],m6[1],m6[2],m7[1],m7[2],m7[3]
-                                if m4z and m5[3] and m6[3] and m7z then
-                                    svg[c]='M';svg[c+1]=m4x;svg[c+2]=' ';svg[c+3]=m4y;svg[c+4]='C';svg[c+5]=m5x;svg[c+6]=' ';svg[c+7]=m5y;svg[c+8]=',';svg[c+9]=m6x;svg[c+10]=' ';svg[c+11]=m6y;svg[c+12]=',';svg[c+13]=m7x;svg[c+14]=' ';svg[c+15]=m7y
-                                    c=c+16
-                                end
-                                local m8x,m8y,m9x,m9y,m10x,m10y,m10z=m8[1],m8[2],m9[1],m9[2],m10[1],m10[2],m10[3]
-                                if m7z and m8[3] and m9[3] and m10z then
-                                    svg[c]='M';svg[c+1]=m7x;svg[c+2]=' ';svg[c+3]=m7y;svg[c+4]='C';svg[c+5]=m8x;svg[c+6]=' ';svg[c+7]=m8x;svg[c+8]=',';svg[c+9]=m9x;svg[c+10]=' ';svg[c+11]=m9y;svg[c+12]=',';svg[c+13]=m10x;svg[c+14]=' ';svg[c+15]=m10y
-                                    c=c+16
-                                end    
-                                local m11x,m11y,m12x,m12y=m11[1],m11[2],m12[1],m12[2]
-                                if m10z and m11[3] and m12[3] and m1z then
-                                    svg[c]='M';vg[c+1]=m10x;svg[c+2]=' ';svg[c+3]=m10y;svg[c+4]='C';svg[c+5]=m11x;svg[c+6]=' ';svg[c+7]=m11y;svg[c+8]=',';svg[c+9]=m12x;svg[c+10]=' ';svg[c+11]=m12y;svg[c+12]=',';svg[c+13]=m1x;svg[c+14]=' ';svg[c+15]=m1y
-                                    c=c+16
-                                end
-                                if labelDat[1] then
-                                    if m1z and m4z and m7z and m10z then
-                                        sLabelDat[sLDC+1]={{m1x,m1y,m1z},{m4x,m4y,m4z},{m7x,m7y,m7z},{m10x,m10y,m10z},labelDat}
-                                        sLDC=sLDC+1
-                                    end
-                                end
-                            else
-                            end
-                        end
-                        svg[c]='"/>'
-                        c=c+1
-                        if sLDC>0 then
-                            for ll=1,sLDC do
-                                local lInfo=sLabelDat[ll]
-                                local text=dat[1]
-                                local s=dat[3]
-                                for i=1,4 do
-                                    local p=lInfo[i]
-                                    local s=s
-                                    if dat[2] then
-                                        s=getSize(s, p[3], 100, 1)
-                                    end
-                                    svg[c]='<text x="'
-                                    svg[c+1]=p[1]
-                                    svg[c+2]='" y="'
-                                    svg[c+3]=p[2]
-                                    svg[c+4]='" fill="white" font-size="'
-                                    svg[c+6]=s
-                                    svg[c+7]='">'
-                                    svg[c+8]=text
-                                    svg[c+9]='</text>'
-                                    c=c+10
-                                end
-                            end
-                        end
-                    end
+                    
                     for cG=1,#customGroups do
                         local customGroup=customGroups[cG]
                         local multiGroups=customGroup[2]
                         local singleGroups=customGroup[3]
-                        svg[c]='<g class="'
-                        svg[c+1]=customGroup[1]
-                        svg[c+2]='">'
-                        c=c+3
+                        svg[c]=format('<g class="%s">',customGroup[1])
+                        c=c+1
                         for mGC=1,#multiGroups do
                             local multiGroup=multiGroups[mGC]
                             local pts=multiGroup[1]
                             local tPoints={}
                             local ct=1
+                            local modP={}
                             for pC=1,#pts do
                                 local p=pts[pC]
-                                local x,y,z=p[1],-p[2],-p[3]
+                                local x,y,z=p[1],p[2],p[3]
                                 local pz=mYX*x+mYY*y+mYZ*z+mYW
-                                if pz>0 then goto behindMG end
+                                if pz<0 then goto behindMG end
 
-                                local ww=-pz
-                                tPoints[ct]={(mXX*x+mXY*y+mXZ*z+mXW)/ww,(mZX*x+mZY*y+mZZ*z+mZW)/ww,ww}
+                                tPoints[ct]={(mXX*x+mXY*y+mXZ*z+mXW)/pz,(mZX*x+mZY*y+mZZ*z+mZW)/pz,pz}
+                                modP[ct]={mx1*x+my1*y+mz1*z,mx2*x+my2*y+mz2*z,mx3*x+my3*y+mz3*z}
                                 ct=ct+1
                                 ::behindMG::
                             end
@@ -767,86 +361,438 @@ function Projector(core, camera)
                             end
                         end
                         for sGC=1,#singleGroups do
-                            local singleGroup = singleGroups[sGC]
+                            local singleGroup=singleGroups[sGC]
                             local p=singleGroup[1]
-                            local x,y,z=p[1],-p[2],-p[3]
+                            local x,y,z=p[1],p[2],p[3]
                             local pz=mYX*x+mYY*y+mYZ*z+mYW
-                            if pz>0 then goto behindSingle end
+                            if pz<0 then goto behindSingle end
                             
-                            local ww=-pz
                             local drawFunction=singleGroup[2]
                             local data=singleGroup[3]
-                            c=drawFunction(svg,c,object,(mXX*x+mXY*y+mXZ*z+mXW)/ww,(mZX*x+mZY*y+mZZ*z+mZW)/ww,ww,data)
+                            c=drawFunction(svg,c,object,(mXX*x+mXY*y+mXZ*z+mXW)/pz,(mZX*x+mZY*y+mZZ*z+mZW)/pz,pz,data)
                             ::behindSingle::
                         end
                         svg[c]='</g>'
                         c=c+1
                     end
-                    for tG=1,#triangleGroups do
-                        local trigGroup=triangleGroups[tG]
-                        svg[c]='<g class="'
-                        svg[c+1]=trigGroup[1]
-                        svg[c+2]='">'
-                        c=c+3
-                        local trigInfo=trigGroup[2]
-                        local pts=trigGroup[3]
-                        local transTrigs={}
-                        for b=1,#trigInfo do
-                            transTrigs[b]={-1,{},trigInfo[b][3]}
-                        end
-                        for ptI=1,#pts do
-                            local pI=pts[ptI]
-                            local p,indices=pI[1],pI[2]
-                            local x,y,z=p[1],-p[2],-p[3]
-                            local pz=mYX*x+mYY*y+mYZ*z+mYW
-                            if pz>0 then goto behindTrig end
+                    local notIntersected = true
+                    
+                    local zBC,aBC,uC,dU=0,0,1,1
+                    local zBuffer,aBuffer,unpackData,drawStringData={},{},{},{}
+                    local oldSelected,newSelected = uiGroups[1][3],false
 
-                            local ww=-pz
-                            for i=1,#indices do
-                                local triangleData=transTrigs[indices[i]]
-                                triangleData[1]=triangleData[1]+ww
-                                local points=triangleData[2]
-                                points[#points+1]={(mXX*x+mXY*y+mXZ*z+mXW)/ww,(mZX*x+mZY*y+mZZ*z+mZW)/ww}
+                    for uiC=1,#uiGroups do
+                        local uiGroup=uiGroups[uiC]
+                        
+                        local elements=uiGroup[2]
+                        local modelElements=uiGroup[4]
+                        
+                        for eC=1,#modelElements do
+                            local mod=modelElements[eC]
+                            local mXO,mYO,mZO = mod[10],mod[11],mod[12]
+
+                            local pointsInfo = mod[9]
+                            local pointsX,pointsY,pointsZ=pointsInfo[1],pointsInfo[2],pointsInfo[3]
+                            local tPointsX,tPointsY = {},{}
+                            local size = #pointsX
+                            tPointsX[size] = false
+                            tPointsY[size] = false
+                            
+                            local xwAdd = mXX*mXO + mXY*mYO + mXZ*mZO + mXW
+                            local ywAdd = mYX*mXO + mYY*mYO + mYZ*mZO + mYW
+                            local zwAdd = mZX*mXO + mZY*mYO + mZZ*mZO + mZW
+                            
+                            for index=1, size do
+                                local x,y,z = pointsX[index],pointsY[index],pointsZ[index]
+                                local pz=mYX*x + mYY*y + mYZ*z + ywAdd
+                                if pz > 0 then
+                                    tPointsX[index] = (mXX*x + mXY*y + mXZ*z + xwAdd)/pz
+                                    tPointsY[index] = (mZX*x + mZY*y + mZZ*z + zwAdd)/pz
+                                end
+                            end 
+                            
+                            local lX,lY,lZ = 0.26726,0.80178,0.53452
+                            local ambience = 0.3
+                            local planes = mod[13]
+                            local planeNumber = #planes
+                            zBuffer[zBC+planeNumber] = false
+                            for p = 1,planeNumber do
+                                local plane = planes[p]
+                                local eXO,eYO,eZO = plane[1]+mXO,plane[2]+mYO,plane[3]+mZO
+                                local eCZ=mYX*eXO+mYY*eYO+mYZ*eZO+mYW
+                                if eCZ<0 then goto behindElement end
+                                local p0X,p0Y,p0Z = P0XD-eXO,P0YD-eYO,P0ZD-eZO
+                                
+                                local NX,NY,NZ=plane[4],plane[5],plane[6]
+                                local dotValue = p0X*NX+p0Y*NY+p0Z*NZ
+                                
+                                if dotValue < 0 then goto behindElement end
+                                
+                                local brightness = (lX*NX+lY*NY+lZ*NZ)
+                                if brightness < 0 then
+                                    brightness = (brightness*0.1)*(1-ambience)+ambience
+                                else
+                                    brightness = (brightness)*(1-ambience)+ambience
+                                end
+                                local r,g,b = plane[8]*brightness,plane[9]*brightness,plane[10]*brightness
+                                
+                                local indices = plane[7]
+                                local data = {r,g,b}
+                                local m = 4
+                                local indexSize = #indices
+                                data[m+indexSize*2-1]=false
+                                
+                                for i=1,indexSize do
+                                    local index = indices[i]
+                                    local pntX = tPointsX[index]
+                                    if not pntX then goto behindElement end
+                                    
+                                    data[m] = pntX
+                                    data[m+1] = tPointsY[index]
+                                    m=m+2
+                                end
+                                zBC = zBC + 1
+                                zBuffer[zBC]={
+                                    (eCZ*dptPercision),
+                                    plane[11],
+                                    eCZ,
+                                    data,
+                                    is3D = true
+                                }
+                                
+                                ::behindElement::
                             end
-                            ::behindTrig::
                         end
-                        sort(transTrigs,trigSort)
-                        for tIdx=1,#transTrigs do
-                            local trig=transTrigs[tIdx]
-                            local tPts=trig[2]
-                            if #tPts~=3 then goto invalid end
-                            local p1,p2,p3=tPts[1],tPts[2],tPts[3]
-                            svg[c]='<path stroke="black" fill="'
-                            svg[c+1]=trig[3]
-                            svg[c+2]='" d="M'
-                            svg[c+3]=p1[1]
-                            svg[c+4]=' '
-                            svg[c+5]=p1[2]
-                            svg[c+6]=' L '
-                            svg[c+7]=p2[1]
-                            svg[c+8]=' '
-                            svg[c+9]=p2[2]
-                            svg[c+10]=' L '
-                            svg[c+11]=p3[1]
-                            svg[c+12]=' '
-                            svg[c+13]=p3[2]
-                            svg[c+14]=' Z"/>'
-                            c=c+15
-                            ::invalid::
+                        for eC=1,#elements do
+                            local el=elements[eC]
+                            if not el[6] then goto behindElement end
+                            
+                            local eO = el[10]
+                            local eXO,eYO,eZO=eO[1],eO[2],eO[3]
+                            
+                            local eCZ=mYX*eXO+mYY*eYO+mYZ*eZO+mYW
+                            if eCZ<0 then goto behindElement end
+                            
+                            el[16].checkUpdate()
+                            
+                            local actions = el[4]
+                            local oRM = el[15]
+                            
+                            zBC=zBC+1
+                            if el[14] and actions[7] then
+                                aBC = aBC + 1
+                                local p0X,p0Y,p0Z = P0XD-eXO,P0YD-eYO,P0ZD-eZO
+                                
+                                local NX,NY,NZ=el[11],el[12],el[13]
+                                    
+                                local t=-(p0X*NX+p0Y*NY+p0Z*NZ)/(VX*NX+VY*NY+VZ*NZ)
+                                local px,py,pz=p0X+t*VX,p0Y+t*VY,p0Z+t*VZ
+                                
+                                local oRM = el[15]
+                                local ox,oy,oz,ow=oRM[1],oRM[2],oRM[3],oRM[4]
+                                local oyoy=oy*oy
+                                local dpth = (eCZ*dptPercision)
+                                zBuffer[zBC]={
+                                    dpth,
+                                    el,
+                                    eCZ,
+                                    false
+                                }
+                                aBuffer[aBC]={
+                                    dpth,
+                                    el,
+                                    eCZ,
+                                    2*((0.5-oyoy-oz*oz)*px+(ox*oy+oz*ow)*py+(ox*oz-oy*ow)*pz),
+                                    2*((ox*oz+oy*ow)*px+(oy*oz-ox*ow)*py+(0.5-ox*ox-oyoy)*pz),
+                                    actions,
+                                    zBC
+                                }
+                            else
+                                zBuffer[zBC]={
+                                    (eCZ*dptPercision),
+                                    el,
+                                    eCZ,
+                                    el[2]
+                                }
+                            end
+                            
+                            ::behindElement::
                         end
-                        svg[c]='</g>'
-                        c=c+1
                     end
-                    svg[c]='</g>'
-                    c=c+1
+                    sort(aBuffer,zSort)
+                    for aC=aBC,1,-1 do
+                        local uiElmt=aBuffer[aC]
+                        
+                        local el = uiElmt[2]
+                        
+                        local hoverDraw,defaultDraw,clickDraw=el[1],el[2],el[3]
+                        local drawForm=defaultDraw
+                        local actions = el[4]
+                            
+                        if notIntersected then
+                            local eBounds = el[14]
+                            if eBounds and actions[7] then
+                                local pX, pZ = uiElmt[4],uiElmt[5]
+                                local inside = false
+                                if type(eBounds) == 'function' then
+                                    inside = eBounds(pX, pZ, uiElmt[3])
+                                else
+                                    local N = #eBounds+1
+                                    local p1 = eBounds[1]
+                                    local p1x,p1y = p1[1],p1[2]
+                                    local offset = 0
+                                    for eb=2,N do
+                                        local mod = eb%N
+                                        if mod == 0 then
+                                            offset = 1
+                                        end
+                                        local p2 = eBounds[mod + offset]
+                                        p1x,p1y = p1[1],p1[2]
+                                        local p2x,p2y = p2[1],p2[2]
+                                        local minY,maxY
+                                        if p1y < p2y then
+                                            minY,maxY = p1y,p2y 
+                                        else 
+                                            minY,maxY = p2y,p1y 
+                                        end
+                                       
+                                        if pZ > minY and pZ <= maxY then
+                                            local maxX = p1x > p2x and p1x or p2x
+                                            if pX <= maxX then
+                                                if p1y ~= p2y then
+                                                    if p1x == p2x or pX <= (pZ-p1y)*(p2x-p1x)/(p2y-p1y)+p1x then
+                                                        inside = not inside
+                                                    end
+                                                end
+                                            end
+                                        end
+                                        p1 = p2
+                                    end
+                                end
+                                if not inside then
+                                    goto broke
+                                end
+                                notIntersected = false
+                                drawForm = hoverDraw
+                                newSelected = uiElmt
+                                local eO = el[10]
+                                local identifier = actions[6]
+                                if oldSelected == false then
+                                    local enter = actions[3]
+                                    if enter then
+                                        enter(identifier,pX,pZ)
+                                    end
+                                elseif newSelected[6] == oldSelected[6] then
+                                    if isClicked then
+                                        drawForm = clickDraw
+                                        local clickAction = actions[1]
+                                        if clickAction then
+                                            clickAction(identifier,pX,pZ,eO[1],eO[2],eO[3])
+                                            isClicked = false
+                                        end
+                                    elseif isHolding then
+                                        local holdAction = actions[2]
+                                        drawForm = clickDraw
+                                        if holdAction then
+                                            hovered = true
+                                            holdAction(identifier,pX,pZ,eO[1],eO[2],eO[3])
+                                        end
+                                    else
+                                        local hoverAction = actions[5]
+                                        
+                                        if hoverAction then
+                                            hovered = true
+                                            hoverAction(identifier,pX,pZ,eO[1],eO[2],eO[3])
+                                        end
+                                    end
+                                else
+                                    local enter = actions[3]
+                                    if enter then
+                                        enter(identifier,pX,pY)
+                                    end
+                                    local leave = oldSelected[6][4]
+                                    if leave then
+                                        leave(identifier,pX,pY)
+                                    end
+                                end
+                                ::broke::
+                            end
+                        end
+                        zBuffer[uiElmt[7]][4] = drawForm
+                    end
+                    
+                    if newSelected == false and oldSelected then
+                        local leave = oldSelected[6][4]
+                        if leave then
+                            leave()
+                        end
+                    end
+                    uiGroups[1][3] = newSelected
+                    
+                    sort(zBuffer,zSort)
+                    for zC=1,zBC do
+                        local uiElmt=zBuffer[zC]
+                        if not uiElmt.is3D then
+                            local el = uiElmt[2]
+                            local eO = el[10]
+                            local eXO,eYO,eZO = eO[1],eO[2],eO[3]
+                            
+                            local distance,count = uiElmt[3],1
+                            
+                            local scale = el[5] or 1
+                            local drawOrder=el[7]
+                            local drawData=el[8]
+                            local points=el[9]
+                            
+                            local rot=el[15]
+                            local fw = -rot[4]
+                            local xxMult,xzMult,yxMult,yzMult,zxMult,zzMult
+                            
+                            local xwAdd = mXX*eXO + mXY*eYO + mXZ*eZO + mXW
+                            local ywAdd = distance
+                            local zwAdd = mZX*eXO + mZY*eYO + mZZ*eZO + mZW
+                            if fw ~= -1 then
+                                local fx,fy,fz = rot[1],rot[2],rot[3]
+                                local rx,ry,rz,rw = fx*vMW+fw*vMX+fy*vMZ-fz*vMY,
+                                                    fy*vMW+fw*vMY+fz*vMX-fx*vMZ,
+                                                    fz*vMW+fw*vMZ+fx*vMY-fy*vMX,
+                                                    fw*vMW-fx*vMX-fy*vMY-fz*vMZ
+
+                                local rxrx,ryry,rzrz = rx*rx,ry*ry,rz*rz
+                                xxMult,xzMult = (1-2*(ryry+rzrz))*pxw,2*(rx*rz-ry*rw)*pxw
+                                yxMult,yzMult = 2*(rx*ry-rz*rw),2*(ry*rz+rx*rw)
+                                zxMult,zzMult = 2*(rx*rz+ry*rw)*pzw,(1-2*(rxrx+ryry))*pzw
+                            else
+                                xxMult,xzMult = mXX,mXZ
+                                yxMult,yzMult = mYX,mYZ
+                                zxMult,zzMult = mZX,mZZ
+                            end
+                            
+                            local oUC = uC
+                            if drawData then
+                                local sizes = drawData['sizes']
+                                if sizes then
+                                    uC = uC + #sizes
+                                end
+                                uC = uC + #drawData
+                            end
+                            
+                            local broken=false
+                            if not drawOrder then
+                                for ePC=1,#points,2 do
+                                    local ex,ez=points[ePC]*scale,points[ePC+1]*scale
+                                    
+                                    local pz=yxMult*ex + yzMult*ez + ywAdd
+                                    if pz<0 then broken=true;break end
+                                    
+                                    distance = distance + pz
+                                    count = count + 1
+                                    
+                                    unpackData[uC]=(xxMult*ex + xzMult*ez + xwAdd)/pz
+                                    unpackData[uC+1]=(zxMult*ex + zzMult*ez + zwAdd)/pz
+                                    uC=uC+2
+                                end
+                            else
+                                for ePC=1,#points,2 do
+                                    local ex,ez=points[ePC]*scale,points[ePC+1]*scale
+                                    
+                                    local pz=yxMult*ex + yzMult*ez + ywAdd
+                                    if pz<0 then broken=true;break end
+                                    
+                                    distance = distance + pz
+                                    count = count + 1
+                                    
+                                    local px = (xxMult*ex + xzMult*ez + xwAdd)/pz
+                                    local py = (zxMult*ex + zzMult*ez + zwAdd)/pz
+                                    
+                                    local indexList = drawOrder[ePC] or {}
+                                    for i=1, #indexList do
+                                        local index = indexList[i] + (uC  - 1)
+                                        unpackData[index] = px
+                                        unpackData[index+1] = py
+                                    end
+                                end
+                            end
+                            local drawForm = uiElmt[4]
+                            mUC = uC
+                            uC = oUC
+                            if not broken and drawForm then
+                                local depthFactor = distance/count
+                                if drawData then
+                                    local drawDatCount = #drawData
+                                    local sizes = drawData['sizes']
+                                    if sizes then
+                                        for i=1, #sizes do
+                                            local size = sizes[i]
+                                            local tSW = type(size)
+                                            if tSW == 'number' then
+                                                unpackData[uC] = atan(size,depthFactor)*nearDivAspect
+                                            elseif tSW == 'function' then
+                                                unpackData[uC] = size(depthFactor, nearDivAspect)
+                                            end
+                                            uC = uC + 1
+                                        end
+                                    end
+                                    for dDC = 1, drawDatCount do
+                                        unpackData[uC] = drawData[dDC]
+                                        uC = uC + 1
+                                    end
+                                end
+                                drawStringData[dU] = drawForm
+                                dU = dU + 1
+                                uC = mUC
+                            end
+                        else
+                            local data = uiElmt[4]
+                            for alm = 1, #data do
+                                unpackData[uC] = data[alm]
+                                uC = uC + 1
+                            end
+                            drawStringData[dU] = uiElmt[2]
+                            dU = dU + 1
+                        end
+                    end
+                    svg[c]=format(concat(drawStringData),unpack(unpackData))
+                    svg[c+1]='</g>'
+                    c=c+2
                 end
                 ::is_nil::
             end
-            svg[c]='</g></svg>'
-            c=c+1
+            svg[c]='</svg>'
+            if avgZC > 0 then
+                local dpth = avgZ/avgZC
+                svgBuffer[alpha] = {dpth,concat(svg)}
+                alpha = alpha + 1
+                if objectGroup.glow then
+                    local size
+                    if objectGroup.scale then
+                        size = atan(objectGroup.gRad,dpth)*nearDivAspect
+                    else
+                        size = objectGroup.gRad
+                    end
+                    svg[1] = format('<svg viewbox="-%g -%g %g %g" class="blur">',objGTransX,objGTransY,width*2,height*2)
+                    svg[2] = [[
+                        <style> 
+                            .blur {
+                                filter: blur(]] .. size .. [[px) saturate(3);
+                                
+                            }
+                        </style>]]
+                    svgBuffer[alpha] = {dpth+0.1,concat(svg)}
+                    alpha = alpha + 1
+                end
+            end
             ::not_enabled::
         end
-        return svg, c
+        sort(svgBuffer,zSort)
+        local svgBufferSize = #svgBuffer
+        if svgBufferSize > 0 then
+            fc = fc - 1
+            for dm=1,svgBufferSize do
+                fullSVG[fc+dm] = svgBuffer[dm][2]
+            end
+        end
+        return fullSVG, fc+svgBufferSize+1, view
     end
     return self
 end
