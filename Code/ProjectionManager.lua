@@ -278,17 +278,6 @@ function Projector(camera)
             local objGTransX = objectGroup.transX or width
             local objGTransY = objectGroup.transY or height
             local objects = objectGroup.objects
-            
-            --local defs = obj[16]
-            --local defSize = #defs
-            --if defSize > 0 then
-            --svg[c] = '<defs>'
-            --for d=1, defSize do
-            --svg[c+d] = defs[d]
-            --end
-            --svg[c+defSize+1] = '</defs>'
-            --c = c + defSize + 2
-            --end
 
             local avgZ, avgZC = 0, 0
             local zBuffer, aBuffer, aBC, zBC = {}, {}, 0, 0
@@ -491,7 +480,6 @@ function Projector(camera)
                         if not el[6] then
                             goto behindElement
                         end
-
                         local eO = el[10]
                         local eXO, eYO, eZO = eO[1], eO[2], eO[3]
 
@@ -499,11 +487,32 @@ function Projector(camera)
                         if eCZ < 0 then
                             goto behindElement
                         end
-
+                        local eCX = mXX * eXO + mXY * eYO + mXZ * eZO + mXW
+                        local eCY = mZX * eXO + mZY * eYO + mZZ * eZO + mZW
                         el[16].checkUpdate()
 
                         local actions = el[4]
                         local oRM = el[15]
+                        local fw = -oRM[4]
+                        local xxMult, xzMult, yxMult, yzMult, zxMult, zzMult
+
+                        if fw ~= -1 then
+                            local fx, fy, fz = oRM[1], oRM[2], oRM[3]
+                            local rx, ry, rz, rw =
+                                fx * vMW + fw * vMX + fy * vMZ - fz * vMY,
+                                fy * vMW + fw * vMY + fz * vMX - fx * vMZ,
+                                fz * vMW + fw * vMZ + fx * vMY - fy * vMX,
+                                fw * vMW - fx * vMX - fy * vMY - fz * vMZ
+
+                            local rxrx, ryry, rzrz = rx * rx, ry * ry, rz * rz
+                            xxMult, xzMult = (1 - 2 * (ryry + rzrz)) * pxw, 2 * (rx * rz - ry * rw) * pxw
+                            yxMult, yzMult = 2 * (rx * ry - rz * rw), 2 * (ry * rz + rx * rw)
+                            zxMult, zzMult = 2 * (rx * rz + ry * rw) * pzw, (1 - 2 * (rxrx + ryry)) * pzw
+                        else
+                            xxMult, xzMult = mXX, mXZ
+                            yxMult, yzMult = mYX, mYZ
+                            zxMult, zzMult = mZX, mZZ
+                        end
 
                         zBC = zBC + 1
                         if el[14] and actions[7] then
@@ -521,9 +530,17 @@ function Projector(camera)
                             zBuffer[zBC] = {
                                 eCZ,
                                 el,
-                                eCZ,
                                 false,
-                                isUi = true
+                                eCX,
+                                eCZ,
+                                eCY,
+                                xxMult, 
+                                xzMult, 
+                                yxMult, 
+                                yzMult, 
+                                zxMult, 
+                                zzMult,
+                                isUI = true
                             }
                             aBuffer[aBC] = {
                                 eCZ,
@@ -538,9 +555,17 @@ function Projector(camera)
                             zBuffer[zBC] = {
                                 eCZ,
                                 el,
-                                eCZ,
                                 el[2],
-                                isUi = true
+                                eCX,
+                                eCZ,
+                                eCY,
+                                xxMult, 
+                                xzMult, 
+                                yxMult, 
+                                yzMult, 
+                                zxMult, 
+                                zzMult,
+                                isUI = true
                             }
                         end
 
@@ -666,40 +691,14 @@ function Projector(camera)
                 local uiElmt = zBuffer[zC]
                 if uiElmt.isUI then
                     local el = uiElmt[2]
-                    local eO = el[10]
-                    local eXO, eYO, eZO = eO[1], eO[2], eO[3]
+                    local distance,el,drawForm,xwAdd,ywAdd,zwAdd,xxMult,xzMult,yxMult,yzMult,zxMult,zzMult=unpack(uiElmt)
 
-                    local distance, count = uiElmt[3], 1
+                    local count = 1
 
                     local scale = el[5] or 1
                     local drawOrder = el[7]
                     local drawData = el[8]
                     local points = el[9]
-
-                    local rot = el[15]
-                    local fw = -rot[4]
-                    local xxMult, xzMult, yxMult, yzMult, zxMult, zzMult
-
-                    local xwAdd = mXX * eXO + mXY * eYO + mXZ * eZO + mXW
-                    local ywAdd = distance
-                    local zwAdd = mZX * eXO + mZY * eYO + mZZ * eZO + mZW
-                    if fw ~= -1 then
-                        local fx, fy, fz = rot[1], rot[2], rot[3]
-                        local rx, ry, rz, rw =
-                            fx * vMW + fw * vMX + fy * vMZ - fz * vMY,
-                            fy * vMW + fw * vMY + fz * vMX - fx * vMZ,
-                            fz * vMW + fw * vMZ + fx * vMY - fy * vMX,
-                            fw * vMW - fx * vMX - fy * vMY - fz * vMZ
-
-                        local rxrx, ryry, rzrz = rx * rx, ry * ry, rz * rz
-                        xxMult, xzMult = (1 - 2 * (ryry + rzrz)) * pxw, 2 * (rx * rz - ry * rw) * pxw
-                        yxMult, yzMult = 2 * (rx * ry - rz * rw), 2 * (ry * rz + rx * rw)
-                        zxMult, zzMult = 2 * (rx * rz + ry * rw) * pzw, (1 - 2 * (rxrx + ryry)) * pzw
-                    else
-                        xxMult, xzMult = mXX, mXZ
-                        yxMult, yzMult = mYX, mYZ
-                        zxMult, zzMult = mZX, mZZ
-                    end
 
                     local oUC = uC
                     if drawData then
@@ -752,7 +751,6 @@ function Projector(camera)
                             end
                         end
                     end
-                    local drawForm = uiElmt[4]
                     mUC = uC
                     uC = oUC
                     if not broken and drawForm then
