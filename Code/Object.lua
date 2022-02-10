@@ -91,14 +91,15 @@ local TEXT_ARRAY = {
     [126] = {{0, 4, 2, 8, 6, 4, 8, 8}, 10,'M%g %gL%g %gL%g %gL%g %g',126}, -- ~
 }
 
-function ObjectGroup(style, objects, transX, transY)
+function ObjectGroup(objects, transX, transY)
     local objects=objects or {}
-    local self={style=style,objects=objects,transX=transX,transY=transY,enabled=true,glow=false,gRad=10,scale = false}
+    local self={style='',objects=objects,transX=transX,transY=transY,enabled=true,glow=false,gRad=10,scale = false}
     function self.addObject(object, id)
         local id=id or #objects+1
         objects[id]=object
         return id
     end
+    function self.setStyle(style) self.style = style end
     function self.removeObject(id) objects[id] = {} end
     function self.hide() self.enabled = false end
     function self.show() self.enabled = true end
@@ -330,7 +331,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
     local positionOffset=offset
     
     local style=style
-    local polylineGroups,circleGroups,curveGroups,customGroups,triangleGroups,uiGroups,subObjects={},{},{},{},{},{},{}
+    local customGroups,uiGroups,subObjects={},{},{}
     local positionType=positionType
     local orientationType=orientationType
     local ori = {0,0,0,1}
@@ -339,7 +340,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
     
     local defs = {}
     local self = {
-        polylineGroups,circleGroups,curveGroups,customGroups,triangleGroups,uiGroups,subObjects,
+        false,false,false,customGroups,false,uiGroups,subObjects,
         positionType, --8
         orientationType, --9
         ori,
