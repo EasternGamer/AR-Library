@@ -1,5 +1,4 @@
 function Projector(camera)
-    local isClicked = false
     -- Localize frequently accessed data
     local utils = require("cpml.utils")
 
@@ -7,9 +6,6 @@ function Projector(camera)
     local core, system, manager = core, system, getManager()
 
     -- Localize frequently accessed functions
-    --- Library-based function calls
-    --local solve=library.systemResolution3
-
     --- System-based function calls
     local getWidth, getHeight, getFov, getMouseDeltaX, getMouseDeltaY, print =
         system.getScreenWidth,
@@ -74,7 +70,7 @@ function Projector(camera)
     local objectGroups = {}
 
     local self = {objectGroups = objectGroups}
-
+    local oldSelected = false
     function self.getSize(size, zDepth, max, min)
         local pSize = atan(size, zDepth) * (fnearDivAspect)
         local max = max or pSize
@@ -114,7 +110,7 @@ function Projector(camera)
     function self.removeObjectGroup(id)
         objectGroups[id] = {}
     end
-
+    
     local cUX, cUY, cUZ, cFX, cFY, cFZ, cRX, cRY, cRZ, sx, sy, sz, sw =
         nil,
         nil,
@@ -227,6 +223,13 @@ function Projector(camera)
     end
 
     function self.getSVG(isvg, fc)
+        local isClicked = false
+        if clicked then
+            clicked = false
+            isClicked = true
+        end
+        local isHolding = isHolding
+        
         local fullSVG = isvg or {}
         local fc = fc or 1
 
@@ -248,13 +251,11 @@ function Projector(camera)
         end
 
         local tanFov = tan(rad(horizontalFov() * 0.5))
-        --system.print("Horizontal: " .. horizontalFov())
-        --system.print("Vertical: " .. vertFov())
-        --system.print("Calculated Vert: " .. math.deg(tanFov))
 
         --- Matrix Subprocessing
         local nearDivAspect = width / tanFov
         fnearDivAspect = nearDivAspect
+        
         -- Localize projection matrix values
         local px1 = 1 / tanFov
         local pz3 = px1 * aspect
@@ -480,6 +481,7 @@ function Projector(camera)
                         if not el[6] then
                             goto behindElement
                         end
+                        el[16].checkUpdate()
                         local eO = el[10]
                         local eXO, eYO, eZO = eO[1], eO[2], eO[3]
 
@@ -487,9 +489,9 @@ function Projector(camera)
                         if eCZ < 0 then
                             goto behindElement
                         end
+                        
                         local eCX = mXX * eXO + mXY * eYO + mXZ * eZO + mXW
                         local eCY = mZX * eXO + mZY * eYO + mZZ * eZO + mZW
-                        el[16].checkUpdate()
 
                         local actions = el[4]
                         local oRM = el[15]
@@ -575,7 +577,7 @@ function Projector(camera)
                 ::is_nil::
             end
             if aBC > 0 then
-                local oldSelected, newSelected = uiGroups[1][3], false
+                local newSelected = false
                 sort(aBuffer, zSort)
                 for aC = aBC, 1, -1 do
                     local uiElmt = aBuffer[aC]
@@ -639,6 +641,7 @@ function Projector(camera)
                                 if enter then
                                     enter(identifier, pX, pZ)
                                 end
+                                --oldSelected = newSelected
                             elseif newSelected[6] == oldSelected[6] then
                                 if isClicked then
                                     drawForm = clickDraw
@@ -671,11 +674,12 @@ function Projector(camera)
                                 if leave then
                                     leave(identifier, pX, pY)
                                 end
+                                
                             end
                             ::broke::
                         end
                     end
-                    zBuffer[uiElmt[7]][4] = drawForm
+                    zBuffer[uiElmt[7]][3] = drawForm
                 end
 
                 if newSelected == false and oldSelected then
@@ -683,8 +687,9 @@ function Projector(camera)
                     if leave then
                         leave()
                     end
+                    
                 end
-                uiGroups[1][3] = newSelected
+                oldSelected = newSelected
             end
             sort(zBuffer, zSort)
             for zC = 1, zBC do
@@ -848,8 +853,10 @@ function Projector(camera)
                         [[
                         <style> 
                             .blur {
-                                filter: blur(]] ..
-                        size .. [[px) saturate(3);
+                                filter: blur(]] .. size .. [[px) 
+                                        brightness(60%)
+                                        saturate(3);
+                                ]] .. objectGroup.gStyle .. [[
                             }
                         </style>]]
                     svgBuffer[alpha] = {dpth + 0.1, concat(svg)}
