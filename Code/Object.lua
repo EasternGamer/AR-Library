@@ -412,9 +412,9 @@ function Object(style, position, offset, orientation, positionType, orientationT
         end
         function self.addSinglePointSVG()
             local self={}
-            local sC=sC+1
             local outArr = {false,false,false,false,false,false}
-            singlePoint[sC]= outArr
+            singlePoint[sC] = outArr
+            sC=sC+1
             function self.setPosition(position)
                 outArr[2],outArr[3],outArr[4]=position[1]/scale+offsetX,position[2]/scale-offsetY,position[3]/scale-offsetZ
                 return self
