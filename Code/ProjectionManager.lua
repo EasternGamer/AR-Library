@@ -289,7 +289,6 @@ function Projector(camera)
                             local depth = mGAvg/(ct-1)
                             zSorter[zBC] = depth
                             zBuffer[depth] = {
-                                depth,
                                 tPoints,
                                 data,
                                 drawFunction
