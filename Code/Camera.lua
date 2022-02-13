@@ -1,4 +1,3 @@
-local rad = math.rad
 CameraTypes={
     fixed={
         fLocal={
@@ -18,15 +17,12 @@ CameraTypes={
 
 function Camera(camType, position, orientation)
     
-    local isViewLocked = false
-    
     local rad=math.rad
     local ori = orientation or {0,0,0}
     local self = {
         cType = camType or CameraTypes.player,
         position = (position or {0,0,0}), 
-        orientation = ori,
-        isViewLocked = false
+        orientation = ori
     }
     
     function self.rotateHeading(heading) self.orientation[2]=self.orientation[2]+rad(heading) end

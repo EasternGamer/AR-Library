@@ -114,24 +114,28 @@ local function RotationHandler(rotArray,resultantPos)
     --====================--
     --Local Math Functions--
     --====================--
-    local manager,rad,sin,cos = getManager(),math.rad,math.sin,math.cos
-    
+    local manager,rad,sin,cos,rand = getManager(),math.rad,math.sin,math.cos,math.random
+    local rotMatrixToQuat = manager.rotMatrixToQuat
     local function getQuaternion(x,y,z,w)
         if type(x) == 'number' then
             if w == nil then
-                x = -rad(x * 0.5)
-                y = rad(y * 0.5)
-                z = -rad(z * 0.5)
-                local s,c=sin,cos
-                local sP,sH,sR=s(x),s(y),s(z)
-                local cP,cH,cR=c(x),c(y),c(z)
-                return (sP*cH*cR-cP*sH*sR),(cP*sH*cR+sP*cH*sR),(cP*cH*sR-sP*sH*cR),(cP*cH*cR+sP*sH*sR)
+                if x == x and y == y and z == z then
+                    x = -rad(x * 0.5)
+                    y = rad(y * 0.5)
+                    z = -rad(z * 0.5)
+                    local s,c=sin,cos
+                    local sP,sH,sR=s(x),s(y),s(z)
+                    local cP,cH,cR=c(x),c(y),c(z)
+                    return (sP*cH*cR-cP*sH*sR),(cP*sH*cR+sP*cH*sR),(cP*cH*sR-sP*sH*cR),(cP*cH*cR+sP*sH*sR)
+                else
+                    return 0,0,0,1
+                end
             else
                 return x,y,z,w
             end
         elseif type(x) == 'table' then
             if #x == 3 then
-                return manager.rotMatrixToQuat(x, y, z)
+                return rotMatrixToQuat(x, y, z)
             elseif #x == 4 then
                 return x[1],x[2],x[3],x[4]
             else
@@ -146,7 +150,6 @@ local function RotationHandler(rotArray,resultantPos)
                aw*bw-ax*bx-ay*by-az*bz
     end
     local function rotatePoint(ax,ay,az,aw,oX,oY,oZ,wX,wY,wZ)
-        --local wxwx,wywy,wzwz=wx*wx,wy*wy,wz*wz
         local axax,ayay,azaz,awaw=ax*ax,ay*ay,az*az,aw*aw
         return 
         2*(oY*(ax*ay-aw*az)+oZ*(ax*az+aw*ay))+oX*(awaw+axax-ayay-azaz)+wX,
@@ -189,10 +192,6 @@ local function RotationHandler(rotArray,resultantPos)
         lX,lY,lZ = lX or pX, lY or pY, lZ or pZ
         lTX,lTY,lTZ = lTX or pX, lTY or pY, lTZ or pZ
         
-        if n == 1 then
-            --ww = -ww
-        end
-        
         local dX,dY,dZ = pX - lX, pY - lY, pZ - lZ
 
         if ww ~= 1 and ww ~= -1 then
@@ -228,7 +227,6 @@ local function RotationHandler(rotArray,resultantPos)
 	   end
         local endTime = system.getTime()
         needsUpdate = false
-        --system.print(string.format('%.3fms', (endTime - timeStart)*1000))
     end
     local function validate()
         if not superManager then
@@ -261,8 +259,12 @@ local function RotationHandler(rotArray,resultantPos)
         return pX,pY,pZ
     end
     function out.setPosition(tx,ty,tz)
-        pX,pY,pZ = tx,ty,tz
-        out.bubble()
+        
+        if not (tx ~= tx or ty ~= ty or tz ~= tz)  then
+            
+            pX,pY,pZ = tx,ty+rand()*0.00001,tz
+            out.bubble()
+        end
     end
     function out.bubble()
         if superManager then
@@ -327,7 +329,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
     
     
     
-    local rad,print=math.rad,system.print
+    local rad,print,rand=math.rad,system.print,math.random
     
     local position=position
     local positionOffset=offset
@@ -409,29 +411,29 @@ function Object(style, position, offset, orientation, positionType, orientationT
             return self
         end
         function self.addSinglePointSVG()
-            local point,drawFunction,data=nil,nil,nil
             local self={}
+            local sC=sC+1
+            local outArr = {false,false,false,false,false,false}
+            singlePoint[sC]= outArr
             function self.setPosition(position)
-                point={position[1]/scale+offsetX,position[2]/scale-offsetY,position[3]/scale-offsetZ}
+                outArr[2],outArr[3],outArr[4]=position[1]/scale+offsetX,position[2]/scale-offsetY,position[3]/scale-offsetZ
                 return self
             end
             function self.setDrawFunction(draw)
-                drawFunction=draw
+                outArr[5] = draw
                 return self
             end
             function self.setData(dat)
-                data=dat
+                outArr[6] = dat
+                return self
+            end
+            function self.setEnabled(enabled)
+                outArr[1] = enabled
                 return self
             end
             function self.build()
-                if point~=nil then
-                    if drawFunction~=nil then
-                        singlePoint[sC]={point,drawFunction,data}
-                        sC=sC+1
-                    else print("WARNING! Malformed single point build operation, no draw function specified. Ignoring.")
-                    end
-                else print("WARNING! Malformed single point build operation, no point specified. Ignoring.")
-                end
+                outArr[1] = true
+                return self
             end
             return self
         end
@@ -487,7 +489,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
             local pointSet = {}
             local actions = {false,false,false,false,false,false,false}
             local mainRotation = {0,0,0,1}
-            local resultantPos = {x,y,z}
+            local resultantPos = {x,y+rand()*0.000001,z}
             local mRot = RotationHandler(mainRotation,resultantPos)
             
             --system.print(string.format('UI Create {%.2f,%.2f,%.2f}', resultantPos[1],resultantPos[2],resultantPos[3]))
