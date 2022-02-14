@@ -99,237 +99,21 @@ function ObjectGroup(objects, transX, transY)
         objects[id]=object
         return id
     end
-    function self.setStyle(style) self.style = style end
     function self.removeObject(id) objects[id] = {} end
+    
     function self.hide() self.enabled = false end
     function self.show() self.enabled = true end
     function self.isEnabled() return self.enabled end
+    
+    function self.setStyle(style) self.style = style end
     function self.setGlowStyle(gStyle) self.gStyle = gStyle end
     function self.setGlow(enable,radius,scale) self.glow = enable; self.gRad = radius or self.gRad; self.scale = scale or false end 
     return self
 end
 
-local function RotationHandler(rotArray,resultantPos)
-    
-    --====================--
-    --Local Math Functions--
-    --====================--
-    local manager,rad,sin,cos,rand = getManager(),math.rad,math.sin,math.cos,math.random
-    local rotMatrixToQuat = manager.rotMatrixToQuat
-    local function getQuaternion(x,y,z,w)
-        if type(x) == 'number' then
-            if w == nil then
-                if x == x and y == y and z == z then
-                    x = -rad(x * 0.5)
-                    y = rad(y * 0.5)
-                    z = -rad(z * 0.5)
-                    local s,c=sin,cos
-                    local sP,sH,sR=s(x),s(y),s(z)
-                    local cP,cH,cR=c(x),c(y),c(z)
-                    return (sP*cH*cR-cP*sH*sR),(cP*sH*cR+sP*cH*sR),(cP*cH*sR-sP*sH*cR),(cP*cH*cR+sP*sH*sR)
-                else
-                    return 0,0,0,1
-                end
-            else
-                return x,y,z,w
-            end
-        elseif type(x) == 'table' then
-            if #x == 3 then
-                return rotMatrixToQuat(x, y, z)
-            elseif #x == 4 then
-                return x[1],x[2],x[3],x[4]
-            else
-                system.print('Unsupported Rotation!')
-            end
-        end
-    end
-    local function multiply(ax,ay,az,aw,bx,by,bz,bw)
-        return ax*bw+aw*bx+ay*bz-az*by,
-               ay*bw+aw*by+az*bx-ax*bz,
-               az*bw+aw*bz+ax*by-ay*bx,
-               aw*bw-ax*bx-ay*by-az*bz
-    end
-    local function rotatePoint(ax,ay,az,aw,oX,oY,oZ,wX,wY,wZ)
-        local axax,ayay,azaz,awaw=ax*ax,ay*ay,az*az,aw*aw
-        return 
-        2*(oY*(ax*ay-aw*az)+oZ*(ax*az+aw*ay))+oX*(awaw+axax-ayay-azaz)+wX,
-        2*(oX*(aw*az+ax*ay)+oZ*(ay*az-aw*ax))+oY*(awaw-axax+ayay-azaz)+wY,
-        2*(oX*(ax*az-aw*ay)+oY*(ax*aw+ay*az))+oZ*(awaw-axax-ayay+azaz)+wZ    
-    end
-    local superManager,needsUpdate = nil,false
-    
-    --=================--
-    --Positional Values--
-    --=================--
-    local pX,pY,pZ = resultantPos[1],resultantPos[2],resultantPos[3] -- These are original values, for relative to super rotation
-    local offX,offY,offZ = 0,0,0
-    local wXYZ = resultantPos
-    --==================--
-    --Orientation Values--
-    --==================--
-    local tix,tiy,tiz,tiw = 0,0,0,1 -- temp intermediate rotation values
-    local tdx,tdy,tdz,tdw = 0,0,0,1 -- temp default intermediate rotation values
-    
-    local ix,iy,iz,iw = 0,0,0,1 -- intermediate rotation values
-    local dx,dy,dz,dw = 0,0,0,1 -- default intermediate rotation values
-    
-    local out_rotation = rotArray
-    local subRotations = {}
-    
-    --==============--
-    --Function Array--
-    --==============--
-    local out = {}
-    
-    --============================--
-    --Primary Processing Functions--
-    --============================--
-    local function process(wx,wy,wz,ww,lX,lY,lZ,lTX,lTY,lTZ,n)
-        local timeStart = system.getTime()
-        
-        n = n or 1
-        wx,wy,wz,ww = wx or 0, wy or 0, wz or 0, ww or 1
-        lX,lY,lZ = lX or pX, lY or pY, lZ or pZ
-        lTX,lTY,lTZ = lTX or pX, lTY or pY, lTZ or pZ
-        
-        local dX,dY,dZ = pX - lX, pY - lY, pZ - lZ
-
-        if ww ~= 1 and ww ~= -1 then
-            if dX ~= 0 or dY ~= 0 or dZ ~= 0 then
-                wXYZ[1],wXYZ[2],wXYZ[3] = rotatePoint(wx,wy,wz,ww,dX,dY,dZ,lTX,lTY,lTZ)
-	       else
-                wXYZ[1],wXYZ[2],wXYZ[3] = lTX,lTY,lTZ
-            end
-            if dw ~= 1 then
-                wx,wy,wz,ww = multiply(wx,wy,wz,ww,dx,dy,dz,dw)
-            end
-            if iw ~= 1 then
-                wx,wy,wz,ww = multiply(wx,wy,wz,ww,ix,iy,iz,iw)
-            end
-        else
-            local nX,nY,nZ = lTX+dX,lTY+dY,lTZ+dZ
-            wXYZ[1],wXYZ[2],wXYZ[3] = nX,nY,nZ
-            if dw ~= 1 then
-                if iw ~= 1 then
-                    wx,wy,wz,ww = multiply(dx,dy,dz,dw,ix,iy,iz,iw)
-                else
-                    wx,wy,wz,ww = dx,dy,dz,dw
-                end
-            else
-                if iw ~= 1 then
-                    wx,wy,wz,ww = ix,iy,iz,iw
-                end
-            end
-        end
-        out_rotation[1],out_rotation[2],out_rotation[3],out_rotation[4] = wx,wy,wz,ww
-        for i=1, #subRotations do
-            subRotations[i].update(wx,wy,wz,ww,pX,pY,pZ,wXYZ[1],wXYZ[2],wXYZ[3],n+1)
-	   end
-        local endTime = system.getTime()
-        needsUpdate = false
-    end
-    local function validate()
-        if not superManager then
-            process()
-        else
-            superManager.bubble()
-        end
-    end
-    local function rotate(isDefault)
-        if isDefault then
-            dx,dy,dz,dw = getQuaternion(tdx,tdy,tdz,tdw)
-        else
-            ix,iy,iz,iw = getQuaternion(tix,tiy,tiz,tiw)
-        end
-        validate()
-    end
-    
-    out.update = process
-    
-    function out.setSuperManager(rotManager)
-        superManager = rotManager
-    end
-    
-    function out.addSubRotation(rotManager)
-        rotManager.setSuperManager(out)
-        subRotations[#subRotations + 1] = rotManager
-        process()
-    end
-    function out.getPosition()
-        return pX,pY,pZ
-    end
-    function out.setPosition(tx,ty,tz)
-        
-        if not (tx ~= tx or ty ~= ty or tz ~= tz)  then
-            
-            pX,pY,pZ = tx,ty+rand()*0.00001,tz
-            out.bubble()
-        end
-    end
-    function out.bubble()
-        if superManager then
-            superManager.bubble()
-        else
-            needsUpdate = true
-        end
-    end
-    function out.checkUpdate()
-        if needsUpdate then
-            local startTime = system.getTime()
-            process()
-            --logRotation.addValue(system.getTime() - startTime)
-        end
-        return needsUpdate
-    end
-    
-    function out.rotateXYZ(rotX,rotY,rotZ,rotW)
-        if rotX and rotY and rotZ then
-            tix,tiy,tiz,tiw = rotX,rotY,rotZ,rotW
-            rotate(false)
-        else
-            if type(rotX) == 'table' then
-                if #rotX == 3 then
-                    tix,tiy,tiz,tiw = rotX[1],rotX[2],rotX[3],nil
-                    goto valid  
-                end
-            end
-            print('Invalid format. Must be three angles, or right, forward and up vectors, or a quaternion. Use radians if angles.')
-            ::valid::
-        end
-    end
-    
-    function out.rotateX(rotX) tix = rotX; tiw = nil; rotate(false) end
-    function out.rotateY(rotY) tiy = rotY; tiw = nil; rotate(false) end
-    function out.rotateZ(rotZ) tiz = rotZ; tiw = nil; rotate(false) end
-    
-    function out.rotateDefaultXYZ(rotX,rotY,rotZ,rotW)
-        if rotX and rotY and rotZ then
-            tdx,tdy,tdz,tdw = rotX,rotY,rotZ,rotW
-            rotate(true)
-        else
-            if type(rotX) == 'table' then
-                if #rotX == 3 then
-                    tdx,tdy,tdz,tdw = rotX[1],rotX[2],rotX[3],nil
-                    goto valid  
-                end
-            end
-            print('Invalid format. Must be three angles, or right, forward and up vectors, or a quaternion. Use radians if angles.')
-            ::valid::
-        end
-    end
-    
-    function out.rotateDefaultX(rotX) tdx = rotX; tdw = nil; rotate(true) end
-    function out.rotateDefaultY(rotY) tdy = rotY; tdw = nil; rotate(true) end
-    function out.rotateDefaultZ(rotZ) tdz = rotZ; tdw = nil; rotate(true) end
-    return out
-end
-
-
 function Object(style, position, offset, orientation, positionType, orientationType, transX, transY)
-    
-    
-    
-    local rad,print,rand=math.rad,system.print,math.random
+    local rad,print,rand,manager=math.rad,system.print,math.random,getManager()
+    local RotationHandler = manager.getRotationManager
     
     local position=position
     local positionOffset=offset
@@ -340,7 +124,6 @@ function Object(style, position, offset, orientation, positionType, orientationT
     local orientationType=orientationType
     local ori = {0,0,0,1}
     local objRotationHandler = RotationHandler(ori,position)
-    objRotationHandler.rotateXYZ(orientation)
     
     local defs = {}
     local self = {
@@ -413,7 +196,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
         function self.addSinglePointSVG()
             local self={}
             local outArr = {false,false,false,false,false,false}
-            singlePoint[sC] = outArr
+            singlePoint[sC]= outArr
             sC=sC+1
             function self.setPosition(position)
                 outArr[2],outArr[3],outArr[4]=position[1]/scale+offsetX,position[2]/scale-offsetY,position[3]/scale-offsetZ
@@ -441,10 +224,10 @@ function Object(style, position, offset, orientation, positionType, orientationT
     end
     function self.setUIElements(style, groupId)
         groupId = groupId or 1
-        local sqrt, s, c,remove = math.sqrt, math.sin, math.cos, table.remove
+        local sqrt,s,c,remove,unpack = math.sqrt, math.sin, math.cos, table.remove,table.unpack
 
         local function createNormal(points, rx, ry, rz, rw)
-            if #points < 6 then
+            if #points < 3 then
                 print("Invalid Point Set!")
                 do
                     return
@@ -452,18 +235,13 @@ function Object(style, position, offset, orientation, positionType, orientationT
             end
             return 2*(rx*ry-rz*rw),1-2*(rx*rx+rz*rz),2*(ry*rz+rx*rw)
         end
-        local function createBounds(points)
-            local bounds = {}
-            local size = #points
+        local function createBounds(pointsX,pointsY)
+            
+            local size = #pointsX
             if size >= 60 then
                 return false
             end
-            local delta = 1
-            for i = 1, size, 2 do
-                bounds[delta] = {points[i],points[i+1]}
-                delta = delta + 1
-            end
-            return bounds
+            return {{unpack(pointsX)},{unpack(pointsY)}}
         end
         
         local elements = {}
@@ -486,14 +264,14 @@ function Object(style, position, offset, orientation, positionType, orientationT
             local huge = math.huge
             local maxX,minX,maxY,minY = -huge,huge,-huge,huge
             
-            local pointSet = {}
+            local pointSetX,pointSetY = {},{}
             local actions = {false,false,false,false,false,false,false}
             local mainRotation = {0,0,0,1}
             local resultantPos = {x,y+rand()*0.000001,z}
             local mRot = RotationHandler(mainRotation,resultantPos)
             
             --system.print(string.format('UI Create {%.2f,%.2f,%.2f}', resultantPos[1],resultantPos[2],resultantPos[3]))
-            local elementData = {false, false, false, actions, false, true, false, false, pointSet, resultantPos, false,false,false,false, mainRotation,mRot}
+            local elementData = {false, false, false, actions, false, true, false, false, pointSetX, pointSetY, resultantPos, false,false,false,false, mainRotation,mRot}
             local subElements = {}
             local elementIndex = eC + 1
             elements[elementIndex] = elementData
@@ -531,54 +309,59 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 end
             end
             function user.addPoint(x,y)
-                local pC = #pointSet
+                local pC = #pointSet+1
                 if x and y then
                     handleBound(x,y)
-                    pointSet[pC+1] = x
-                    pointSet[pC+2] = y
+                    pointSetX[pC] = x
+                    pointSetY[pC] = y
                 else
                     if type(x) == 'table' and #x > 0 then
                         local x,y = x[1], x[2]
                         handleBound(x,y)
-                        pointSet[pC+1] = x
-                        pointSet[pC+2] = y
+                        pointSetX[pC] = x
+                        pointSetY[pC] = y
                     else
                         print('Invalid format for point.')
                     end
                 end
             end
-            function user.addPoints(points)
-                local pnts = elementData[9]
-                pointSet = pnts
+            function user.addPoints(points,override)
+                local pntsX,pntsY
+                if override then
+                    pntsX,pntsY = {},{}
+                    elementData[9],elementData[10] = pntsX,pntsY
+                    pointSetX,pointSetY = pntsX,pntsY
+                else
+                    pntsX,pntsY = elementData[9],elementData[10]
+                    pointSetX,pointSetY = pntsX,pntsY
+                end
                 if points then
                     local pointCount = #points
                     if pointCount > 0 then
                         local pType = type(points[1])
                         if pType == 'number' then
-                            local startIndex = #pnts
+                            local startIndex = #pntsX
                             for i = 1, pointCount,2 do
                                 local index = startIndex + i
                                 
                                 local x,y = points[i],points[i+1]
                                 handleBound(x,y)
                                 
-                                pnts[index] = x
-                                pnts[index+1] = y
+                                pntsX[index] = x
+                                pntsY[index] = y
                             end
                         elseif pType == 'table' then
                             
-                            local startIndex = #pnts
-                            local interval = 1
+                            local startIndex = #pntsX
                             for i = 1, pointCount do
-                                local index = startIndex + interval
+                                local index = startIndex + i
                                 
                                 local point = points[i]
                                 local x,y = point[1],point[2]
                                 handleBound(x,y)
                                 
-                                pnts[index] = x
-                                pnts[index + 1] = y
-                                interval=interval+2
+                                pntsX[index] = x
+                                pntsY[index] = y
                             end
                         else
                             print('No compatible format found.')
@@ -592,21 +375,12 @@ function Object(style, position, offset, orientation, positionType, orientationT
             end
             
             local function updateNormal()
-                if elementData[14] then
-                    user.setNormal(createNormal(pointSet, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4]))
+                if elementData[15] then
+                    user.setNormal(createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4]))
                 end
             end
             
-            function user.rotateDefaultXYZ(rX,rY,rZ,rW) mRot.rotateDefaultXYZ(rX,rY,rZ,rW); updateNormal() end
-            function user.rotateDefaultX(rX) mRot.rotateDefaultX(rX); updateNormal() end
-            function user.rotateDefaultY(rY) mRot.rotateDefaultY(rY); updateNormal() end
-            function user.rotateDefaultZ(rZ) mRot.rotateDefaultZ(rZ); updateNormal() end
-            
-            function user.rotateXYZ(rX,rY,rZ,rW) mRot.rotateXYZ(rX,rY,rZ,rW); updateNormal() end
-            function user.rotateX(rX) mRot.rotateX(rX); updateNormal() end
-            function user.rotateY(rY) mRot.rotateY(rY); updateNormal() end
-            function user.rotateZ(rZ) mRot.rotateZ(rZ); updateNormal() end
-            
+            mRot.assignFunctions(user, updateNormal)
 
             local function drawChecks()
                 local defaultDraw = elementData[2]
@@ -656,16 +430,16 @@ function Object(style, position, offset, orientation, positionType, orientationT
             local psX,psY = 0,0
             function user.move(sx,sy,indices,updateHitbox)
                 if not indices then
-                    for i = 1, #pointSet, 2 do
-                        pointSet[i] = pointSet[i] - psX + sx
-                        pointSet[i+1] = pointSet[i+1] - psY + sy
+                    for i = 1, #pointSet do
+                        pointSetX[i] = pointSetX[i] - psX + sx
+                        pointSetY[i] = pointSetY[i] - psY + sy
                     end
                     maxX,minX,maxY,minY = maxX+sx,minX+sx,maxY+sy,minY+sy
                 else
                     for i=1,#indices do
-                        local index = indices[i]*2-1
-                        pointSet[index] = pointSet[index] - psX + sx
-                        pointSet[index+1] = pointSet[index+1] - psY + sy
+                        local index = indices[i]
+                        pointSetX[index] = pointSetX[index] - psX + sx
+                        pointSetY[index] = pointSetY[index] - psY + sy
                     end
                     -- TODO: Check min-max values and update accordingly
                 end
@@ -673,31 +447,31 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 psY = sy
                 
                 if updateHitbox then
-                    user.setBounds(createBounds(pointSet))
+                    user.setBounds(createBounds(pointSetX))
                 end
             end
-            local ogPointSet = nil
+            local ogPointSetX,ogPointSetY
             function user.moveTo(sx,sy,indices,updateHitbox,useOG)
                 if not indices then
                     print('ERROR: No indices specified!')
                 else
-                    if not ogPointSet then
-                        ogPointSet = {table.unpack(pointSet)}
+                    if not ogPointSetX then
+                        ogPointSetX = {table.unpack(pointSetX)}
+                        ogPointSetY = {table.unpack(pointSetY)}
                     end
                     for i=1,#indices do
-                        local index = indices[i]*2-1
+                        local index = indices[i]
                         if not useOG then
-                            pointSet[index] = sx
-                            pointSet[index+1] = sy
+                            pointSetX[index] = sx
+                            pointSetY[index] = sy
                         else
-                            pointSet[index] = ogPointSet[index] + sx
-                            pointSet[index+1] = ogPointSet[index+1] + sy
+                            pointSetX[index] = ogPointSetX[index] + sx
+                            pointSetY[index] = ogPointSetY[index] + sy
                         end
                     end
-                    -- TODO: Check min-max values and update accordingly
                 end
                 if updateHitbox then
-                    user.setBounds(createBounds(pointSet))
+                    user.setBounds(createBounds(pointSetX,pointSetY))
                 end
             end
             
@@ -706,12 +480,12 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 for i=1, #indices do
                     local index = indices[i]
                     
-                    local order = drawOrder[index*2-1]
+                    local order = drawOrder[index]
                     if not order then
                         order = {}
-                        drawOrder[index*2-1] = order
+                        drawOrder[index] = order
                     end
-                    order[#order+1] = i*2-1
+                    order[#order+1] = i
                 end
                 elementData[7] = drawOrder
             end
@@ -727,40 +501,42 @@ function Object(style, position, offset, orientation, positionType, orientationT
             end
             function user.getDrawOrder() return elementData[7] end
             
-            function user.getPoints() return elementData[9] end
+            function user.getPoints() return elementData[9],elementData[10] end
             
             function user.setDrawOrder(drawOrder) elementData[7] = drawOrder end
             function user.setDrawData(drawData) elementData[8] = drawData end
             
-            function user.setPoints(points) pointSet = points; elementData[9] = pointSet end
+            function user.setPoints(pointsX,pointsY) 
+                if not pointsY then 
+                    user.addPoints(pointsX,true)
+                else
+                    pointSetX,pointSetY = pointsX,pointsY
+                    elementData[9],elementData[10] = pointsX,pointsY
+                end
+            end
             
             function user.setElementIndex(eI) elementIndex = eI end
             function user.getElementIndex(eI) return elementIndex end
             
-            function user.setPosition(sx,sy,sz)
-                mRot.setPosition(sx,sy,sz)
-            end
-            
             function user.setNormal(nx,ny,nz)
-                elementData[11] = nx
-                elementData[12] = ny
-                elementData[13] = nz
+                elementData[12] = nx
+                elementData[13] = ny
+                elementData[14] = nz
             end
             
             function user.setBounds(bounds)
-                elementData[14] = bounds
+                elementData[15] = bounds
             end
-            function user.getPosition() return mRot.getPosition() end
             
             function user.build(force, hasBounds)
                 
-                local nx, ny, nz = createNormal(pointSet, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4])
+                local nx, ny, nz = createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4])
                 if nx then
                     if elementData[2] then
                         user.setNormal(nx,ny,nz)
                         if not force then
                             if hasBounds or hasBounds == nil then
-                                user.setBounds(createBounds(pointSet))
+                                user.setBounds(createBounds(pointSetX,pointSetY))
                             else
                                 user.setBounds(false)
                             end
@@ -778,7 +554,8 @@ function Object(style, position, offset, orientation, positionType, orientationT
         function self.createText(tx, ty, tz)
             local concat,byte,upper = table.concat,string.byte,string.upper
             
-            local userFunc, text = createUITemplate(tx, ty, tz)
+            local userFunc, textArr = createUITemplate(tx, ty, tz)
+            
             local textCache,offsetCacheX,offsetCacheY,txt = {},{},0,''
             local drawData = {['sizes']={0.08333333333},'white',1}
             local alignmentX,alignmentY = 'middle','middle'
@@ -866,7 +643,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 local woffsetX,offsetXCounter = offsetCacheX[1],1
                 local fontSize = drawData.sizes[1] / wScale
 
-                local points,drawStrings = {},{'<path stroke-width="%gpx" stroke="%s" stroke-opacity="%g" fill="none" d="'}
+                local pointsX,pointsY,drawStrings = {},{},{'<path stroke-width="%gpx" stroke="%s" stroke-opacity="%g" fill="none" d="'}
                 local count = 1
                 
                 local textCacheSize = #textCache
@@ -881,9 +658,9 @@ function Object(style, position, offset, orientation, positionType, orientationT
                         
                         handleBound(x,y)
                         
-                        points[count] = x
-                        points[count + 1] = y
-                        count = count + 2
+                        pointsX[count] = x
+                        pointsY[count] = y
+                        count = count + 1
                     end
                     woffsetX = woffsetX + charSize * fontSize
                     if char[4] == 10 then
@@ -894,9 +671,10 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 end
 
                 drawStrings[textCacheSize+2] = '"/>'
-                
-                userFunc.setDefaultDraw(concat(drawStrings))
-                userFunc.setPoints(points)
+                local d = concat(drawStrings)
+                userFunc.setDefaultDraw(d)
+                userFunc.setClickDraw(d)
+                userFunc.setPoints(pointsX,pointsY)
             end
             
             function userFunc.setText(text)
@@ -988,8 +766,8 @@ function Object(style, position, offset, orientation, positionType, orientationT
         function self.createProgressBar(ex, ey, ez)
             
             local userFuncOut,outline = createUITemplate(ex, ey, ez)
-            local userFuncFill,fill = createUITemplate(ex, ey, ez, 1)
-
+            local userFuncFill,fill = createUITemplate(0, 0, 0)
+            userFuncFill.setPositionIsRelative(true)
             userFuncOut.addSubElement(userFuncFill)
 
             local sPointIndices = {}
@@ -1024,15 +802,14 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 local sPCount = #sPointIndices
                 local ePCount = #ePointIndices
                 
-                local points = userFuncFill.getPoints()
-                if #points > 0 then
+                local pointsX,pointsY = userFuncFill.getPoints()
+                if #pointsX > 0 then
                     if sPCount == ePCount and sPCount > 0 then
                         for i=1, sPCount do
                             local sPI = sPointIndices[i]
                             local ePI = ePointIndices[i]
-                            
-                            local xChangePercent = (points[ePI]-points[sPI]) * 0.01
-                            local yChangePercent = (points[ePI+1]-points[sPI+1]) * 0.01
+                            local xChangePercent = (pointsX[ePI]-pointsX[sPI]) * 0.01
+                            local yChangePercent = (pointsY[ePI]-pointsY[sPI]) * 0.01
                             intervals[i] = {xChangePercent,yChangePercent}
                         end
                     end
@@ -1040,23 +817,17 @@ function Object(style, position, offset, orientation, positionType, orientationT
             end
             
             function userFuncOut.setStartIndices(indices)
-                for i=1, #indices do
-                    local index = indices[i]*2-1
-                    sPointIndices[i]=index
-                end
+                sPointIndices = indices
                 makeIntervals()
             end
             
             function userFuncOut.setEndIndices(indices)
-                for i=1, #indices do
-                    local index = indices[i]*2-1
-                    ePointIndices[i]=index
-                end
+                ePointIndices = indices
                 makeIntervals()
             end
             
             local addPointsOld = userFuncOut.addPoints
-            function userFuncOut.addPoints(points) 
+            function userFuncOut.addPoints(points)
                 addPointsOld(points)
                 makeIntervals()
             end
@@ -1069,17 +840,13 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 if progress > 100 then
                     progress = 100
                 end
-                local points = userFuncOut.getPoints()
-                
+                local pointsX,pointsY = userFuncFill.getPoints()
                 for i=1, #ePointIndices do
                     local c = intervals[i]
-                    local xC,yC = c[1],c[2]
                     local sPI = sPointIndices[i]
                     local ePI = ePointIndices[i]
-                    
-                    points[ePI] = points[sPI] + xC * progress
-                    points[ePI+1] = points[sPI+1] + yC * progress
-                    
+                    pointsX[ePI] = pointsX[sPI] + c[1] * progress
+                    pointsY[ePI] = pointsY[sPI] + c[2] * progress
                 end
             end
             function userFuncOut.setFillPoints(points)
@@ -1095,14 +862,13 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 userFuncFill.setDefaultDraw(draw)
             end
             function userFuncOut.setFillOffsetPosition(tx,ty,tz)
-                userFuncFill.setOffsetPosition(tx,ty,tz)
+                userFuncFill.setPosition(tx,ty,tz)
             end
             
             return userFuncOut
         end
-        function self.createCustomDraw(x,y,z)
-            return createUITemplate(x,y,z)
-        end
+        self.createCustomDraw = createUITemplate
+        
         local mElementIndex = 0
         function self.create3DObject(x,y,z)
             local userFunc = {}
@@ -1200,22 +966,10 @@ function Object(style, position, offset, orientation, positionType, orientationT
         return self
     end
     
-    function self.setPosition(posX, posY, posZ) self[11] = {posX, posY, posZ} end
+    objRotationHandler.assignFunctions(self)
     
-    function self.rotateDefaultXYZ(rX,rY,rZ,rW) objRotationHandler.rotateDefaultXYZ(rX,rY,rZ,rW); end
-    function self.rotateDefaultX(rX) objRotationHandler.rotateDefaultX(rX); end
-    function self.rotateDefaultY(rY) objRotationHandler.rotateDefaultY(rY); end
-    function self.rotateDefaultZ(rZ) objRotationHandler.rotateDefaultZ(rZ); end
-            
-    function self.rotateXYZ(rX,rY,rZ,rW) objRotationHandler.rotateXYZ(rX,rY,rZ,rW); end
-    function self.rotateX(rX) objRotationHandler.rotateX(rX); end
-    function self.rotateY(rY) objRotationHandler.rotateY(rY); end
-    function self.rotateZ(rZ) objRotationHandler.rotateZ(rZ); end
-    
-    function self.addSubObject(object, id)
-        local id=id or #self[6]+1
-        self[6][id]=object
-        return id
+    function self.addSubObject(object)
+        objRotationHandler.addSubRotation(object.getRotationManager())
     end
     function self.removeSubObject(id)
         self[6][id]={}

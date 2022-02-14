@@ -18,18 +18,15 @@ CameraTypes={
 function Camera(camType, position, orientation)
     
     local rad=math.rad
-    local ori = orientation or {0,0,0}
+    local ori = orientation or {0,0,0,1}
+    local pos = position or {0,0,0}
+    local rotM = getManager().getRotationManager(orientation,pos)
     local self = {
         cType = camType or CameraTypes.player,
-        position = (position or {0,0,0}), 
+        position = pos, 
         orientation = ori
     }
-    
-    function self.rotateHeading(heading) self.orientation[2]=self.orientation[2]+rad(heading) end
-    function self.rotatePitch(pitch) self.orientation[1]=self.orientation[1]+rad(pitch) end
-    function self.rotateRoll(roll) self.orientation[3]=self.orientation[3]+rad(roll) end
-    function self.setAlignmentType(alignmentType) self.cType = alignmentType end
-    function self.setPosition(pos) self.position={pos[1],pos[2],pos[3]} end
+    rotM.assignFunctions(self)
 
     return self
 end
