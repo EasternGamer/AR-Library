@@ -82,17 +82,17 @@ function Projector(camera)
         local modelMatrices = {}
 
         -- Localize Object values.
-        local objOri, objPos = mObject[10], mObject[12]
+        local objOri, objPos = mObject[6], mObject[7]
         local objPosX, objPosY, objPosZ = objPos[1], objPos[2], objPos[3]
         local wx, wy, wz, ww = objOri[1], objOri[2], objOri[3], objOri[4]
-        if mObject[9] == 1 then
+        if mObject[5] == 1 then
             wx, wy, wz, ww =
                 wx*aw + ww*ax + wy*az - wz*ay,
                 wy*aw + ww*ay + wz*ax - wx*az,
                 wz*aw + ww*az + wx*ay - wy*ax,
                 ww*aw - wx*ax - wy*ay - wz*az
         end
-        if mObject[8] == 2 then -- If Local
+        if mObject[4] == 2 then -- If Local
             return wx, wy, wz, ww, 
             objPosX, -- Convert this to 
             objPosY, 
@@ -106,7 +106,6 @@ function Projector(camera)
                 cUX * oPX + cUY * oPY + cUZ * oPZ
         end
     end
-
     function self.getViewMatrix()
         local cU, cF, cR = getCWorldU(), getCWorldF(), getCWorldR()
         cRX, cRY, cRZ, cFX, cFY, cFZ, cUX, cUY, cUZ = cR[1], cR[2], cR[3], cF[1], cF[2], cF[3], cU[1], cU[2], cU[3]
@@ -154,8 +153,9 @@ function Projector(camera)
                    lEyeX, lEyeY, lEyeZ
         end
     end
-
+    
     function self.getSVG(isvg, fc)
+        local getT = system.getTime
         local isClicked = false
         if clicked then
             clicked = false
@@ -169,7 +169,7 @@ function Projector(camera)
         local vx1, vy1, vz1, vx2, vy2, vz2, vx3, vy3, vz3, vw1, vw2, vw3, lCX, lCY, lCZ =
             self.getViewMatrix()
         local vx, vy, vz, vw = matrixToQuat(vx1, vy1, vz1, vx2, vy2, vz2, vx3, vy3, vz3)
-
+        
         local atan, sort, format, unpack, concat, getModelMatrix =
             atan,
             table.sort,
@@ -211,16 +211,16 @@ function Projector(camera)
             local avgZ, avgZC = 0, 0
             local zBuffer,zSorter, aBuffer,aSorter, aBC, zBC = {},{},{},{}, 0, 0
             local unpackData, drawStringData, uC, dU = {},{}, 1, 1
+            
             local notIntersected = true
             for m = 1, #objects do
                 local obj = objects[m]
-                if obj[12] == nil then
+                if not obj[1] then
                     goto is_nil
                 end
 
                 local mx, my, mz, mw, mw1, mw2, mw3 = getModelMatrix(obj)
 
-                local objStyle = obj[11]
                 local vMX, vMY, vMZ, vMW =
                     mx * vw + mw * vx + my * vz - mz * vy,
                     my * vw + mw * vy + mz * vx - mx * vz,
@@ -251,81 +251,79 @@ function Projector(camera)
                 avgZC = avgZC + 1
                 local P0XD, P0YD, P0ZD = lCX - mw1, lCY - mw2, lCZ - mw3
 
-                local customGroups, uiGroups = obj[4], obj[6]
+                local customGroups, uiGroups = obj[2], obj[3]
                 for cG = 1, #customGroups do
                     local customGroup = customGroups[cG]
-                    local multiGroups = customGroup[2]
-                    local singleGroups = customGroup[3]
+                    local multiGroups = customGroup[1]
+                    local singleGroups = customGroup[2]
                     for mGC = 1, #multiGroups do
                         local multiGroup = multiGroups[mGC]
-                        local pts = multiGroup[1]
-                        local tPoints = {}
-                        local ct = 1
-                        local mGAvg = 0
-                        for pC = 1, #pts do
-                            local p = pts[pC]
-                            local x, y, z = p[1], p[2], p[3]
-                            local pz = mYX * x + mYY * y + mYZ * z + mYW
+                        local enabled = multiGroup[1]
+                        if not enabled then goto disabled end
+                        
+                        local tPointsX,tPointsY,tPointsZ = {},{},{}
+                        local pointsX,pointsY,pointsZ = multiGroup[2],multiGroup[3],multiGroup[4]
+                        local size = #pointsX
+                        local mGAvg,less = 0,less
+                        for pC=1,size do
+                            local x,y,z = pointsX[pC],pointsY[pC],pointsZ[pC]
+                            local pz = mYX*x + mYY*y + mYZ*z + mYW
                             if pz < 0 then
+                                less = less + 1
                                 goto behindMG
                             end
 
-                            tPoints[ct] = {
-                                (mXX * x + mXY * y + mXZ * z + mXW) / pz,
-                                (mZX * x + mZY * y + mZZ * z + mZW) / pz,
-                                pz
-                            }
-                            mGAvg = mGAvg + pz
-                            ct = ct + 1
+                            tPointsX[pC] = (mXX*x + mXY*y + mXZ*z + mXW)/pz
+                            tPointsY[pC] = (mZX*x + mZY*y + mZZ*z + mZW)/pz
+                            tPointsZ[pC] = pz
+                            mGAvg=mGAvg + pz
                             ::behindMG::
                         end
-                        if ct ~= 1 then
-                            local drawFunction = multiGroup[2]
-                            local data = multiGroup[3]
+                        if less~=size then
+                            local depth = mGAvg/(size-less)
                             zBC = zBC + 1
-                            local depth = mGAvg/(ct-1)
                             zSorter[zBC] = depth
                             zBuffer[depth] = {
-                                tPoints,
-                                data,
-                                drawFunction
+                                tPointsX,
+                                tPointsY,
+                                tPointsZ,
+                                multiGroup[5],
+                                multiGroup[6]
                             }
                         end
+                        ::disabled::
                     end
                     for sGC = 1, #singleGroups do
                         local singleGroup = singleGroups[sGC]
-                        if not singleGroup[1] then goto behindSingle end
+                        if not singleGroup[1] then goto disabled end
                         
-                        local x, y, z = singleGroup[2], singleGroup[3], singleGroup[4]
-                        local pz = mYX * x + mYY * y + mYZ * z + mYW
-                        if pz < 0 then
-                            goto behindSingle
-                        end
-
-                        local drawFunction = singleGroup[5]
-                        local data = singleGroup[6]
+                        local x,y,z = singleGroup[2], singleGroup[3], singleGroup[4]
+                        local pz = mYX*x + mYY*y + mYZ*z + mYW
+                        if pz < 0 then goto disabled end
+                        
                         zBC = zBC + 1
                         zSorter[zBC] = pz
                         zBuffer[pz] = {
-                            (mXX * x + mXY * y + mXZ * z + mXW) / pz,
-                            (mZX * x + mZY * y + mZZ * z + mZW) / pz,
-                            data,
-                            drawFunction,
+                            (mXX*x + mXY*y + mXZ*z + mXW)/pz,
+                            (mZX*x + mZY*y + mZZ*z + mZW)/pz,
+                            singleGroup[5],
+                            singleGroup[6],
                             isCustomSingle = true
                         }
-                        ::behindSingle::
+                        ::disabled::
                     end
                 end
+                local t1 = getT()
                 for uiC = 1, #uiGroups do
                     local uiGroup = uiGroups[uiC]
 
-                    local elements = uiGroup[2]
-                    local modelElements = uiGroup[4]
+                    local elements = uiGroup[1]
+                    local modelElements = uiGroup[2]
 
                     for eC = 1, #modelElements do
                         local mod = modelElements[eC]
                         local mXO, mYO, mZO = mod[10], mod[11], mod[12]
-
+                        local scale = mod[5]
                         local pointsInfo = mod[9]
                         local pointsX, pointsY, pointsZ = pointsInfo[1], pointsInfo[2], pointsInfo[3]
                         local tPointsX, tPointsY = {}, {}
@@ -338,7 +336,7 @@ function Projector(camera)
                         local zwAdd = mZX * mXO + mZY * mYO + mZZ * mZO + mZW
 
                         for index = 1, size do
-                            local x, y, z = pointsX[index], pointsY[index], pointsZ[index]
+                            local x, y, z = pointsX[index]*scale, pointsY[index]*scale, pointsZ[index]*scale
                             local pz = mYX * x + mYY * y + mYZ * z + ywAdd
                             if pz > 0 then
                                 tPointsX[index] = (mXX * x + mXY * y + mXZ * z + xwAdd) / pz
@@ -373,30 +371,33 @@ function Projector(camera)
                             else
                                 brightness = (brightness) * (1 - ambience) + ambience
                             end
-                            local r, g, b = plane[8] * brightness, plane[9] * brightness, plane[10] * brightness
-
-                            local indices = plane[7]
-                            local data = {r, g, b}
-                            local m = 4
-                            local indexSize = #indices
-                            data[m + indexSize * 2 - 1] = false
-
-                            for i = 1, indexSize do
-                                local index = indices[i]
-                                local pntX = tPointsX[index]
-                                if not pntX then
-                                    goto behindElement
-                                end
-
-                                data[m] = pntX
-                                data[m + 1] = tPointsY[index]
-                                m = m + 2
-                            end
+                            
                             zBC = zBC + 1
                             zSorter[zBC] = eCZ
                             zBuffer[eCZ] = {
-                                plane[11],
-                                data,
+                                function (uD,c)
+                                    local plane = plane
+                                    local m = 3 + c
+                                    local indices = plane[7]
+                                    local indexSize = #indices
+                                    uD[m + indexSize * 2 - 1] = false
+                                
+                                    for i = 1, indexSize do
+                                        local index = indices[i]
+                                        local pntX = tPointsX[index]
+                                        if not pntX then
+                                            return '',c
+                                        end
+
+                                        uD[m] = pntX
+                                        uD[m + 1] = tPointsY[index]
+                                        m = m + 2
+                                    end
+                                    uD[c] = plane[8] * brightness
+                                    uD[c+1] = plane[9] * brightness
+                                    uD[c+2] = plane[10] * brightness
+                                    return plane[11], m
+                                end,
                                 is3D = true
                             }
 
@@ -495,6 +496,7 @@ function Projector(camera)
                         ::behindElement::
                     end
                 end
+                logCompute.addValue(getT()-t1)
                 ::is_nil::
             end
             if aBC > 0 then
@@ -591,11 +593,11 @@ function Projector(camera)
                             else
                                 local enter = actions[3]
                                 if enter then
-                                    enter(identifier, pX, pY)
+                                    enter(identifier, pX, pZ)
                                 end
                                 local leave = oldSelected[4][4]
                                 if leave then
-                                    leave(identifier, pX, pY)
+                                    leave(identifier, pX, pZ)
                                 end
                                 
                             end
@@ -613,7 +615,10 @@ function Projector(camera)
                 end
                 oldSelected = newSelected
             end
+            local t1 = getT()
             sort(zSorter)
+            logSort.addValue(getT()-t1)
+            local t1 = getT()
             for zC = zBC, 1,-1 do
                 local distance = zSorter[zC]
                 local uiElmt = zBuffer[distance]
@@ -629,7 +634,7 @@ function Projector(camera)
                     local ywAdd = distance
                     local count = 1
                      
-                    local scale = el[5] or 1
+                    local scale = el[5]
                     local drawOrder = el[7]
                     local drawData = el[8]
                     local pointsX,pointsY = el[9],el[10]
@@ -712,33 +717,18 @@ function Projector(camera)
                     uC = mUC
                     ::broken::
                 elseif uiElmt.is3D then
-                    local data = uiElmt[2]
-                    for alm = 1, #data do
-                        unpackData[uC] = data[alm]
-                        uC = uC + 1
-                    end
-                    drawStringData[dU] = uiElmt[1]
+                    drawStringData[dU],uC = uiElmt[1](unpackData,uC)
                     dU = dU + 1
                 elseif uiElmt.isCustomSingle then
-                    local x,y,data,drawFunction = uiElmt[1],uiElmt[2],uiElmt[3],uiElmt[4]
-                    local unpackSize = #unpackData
-                    drawStringData[dU] = drawFunction(x,y,distance,data,unpackData,uC) or '<text x=0 y=0>Error: N-CS</text>'
+                    drawStringData[dU],uC = uiElmt[3](uiElmt[1],uiElmt[2],distance,uiElmt[4],unpackData,uC)
                     dU = dU + 1
-                    local newUnpackSize = #unpackData
-                    if unpackSize ~= newUnpackSize then
-                        uC = newUnpackSize + 1
-                    end
                 else
-                    local points,data,drawFunction = uiElmt[1],uiElmt[2],uiElmt[3]
-                    local unpackSize = #unpackData
-                    drawStringData[dU] = drawFunction(points,data,unpackData,uC)
+                    drawStringData[dU],uC = uiElmt[4](uiElmt[1],uiElmt[2],uiElmt[3],uiElmt[6],unpackData,uC)
                     dU = dU + 1
-                    local newUnpackSize = #unpackData
-                    if unpackSize ~= newUnpackSize then
-                        uC = newUnpackSize + 1
-                    end
                 end
             end
+            logBuild.addValue(getT()-t1)
+            local t1 = getT()
             local svg = {
                 format(
                     '<svg viewbox="-%g -%g %g %g">',
@@ -748,14 +738,15 @@ function Projector(camera)
                     height * 2
                 ),
                 format(
-                    '<style> svg{width:%gpx;height:%gpx;position:absolute;top:0px;left:0px;} %s </style>',
+                    '<style>svg{background:none;width:%gpx;height:%gpx;position:absolute;top:0px;left:0px;} path{stroke:currentColor; fill:currentColor; stroke-width:1; stroke-linecap:butt}%s</style>',
                     width * nFactor,
                     height * nFactor,
                     objectGroup.style
                 ),
-                format(concat(drawStringData), unpack(unpackData)),
+                concat(drawStringData):format(unpack(unpackData)),
                 '</svg>'
             }
+            logCreate.addValue(getT()-t1)
             if avgZC > 0 then
                 local dpth = avgZ / avgZC
                 svgBuffer[alpha] = {dpth, concat(svg)}

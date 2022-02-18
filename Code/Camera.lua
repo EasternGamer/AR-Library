@@ -20,7 +20,7 @@ function Camera(camType, position, orientation)
     local rad=math.rad
     local ori = orientation or {0,0,0,1}
     local pos = position or {0,0,0}
-    local rotM = getManager().getRotationManager(orientation,pos)
+    local rotM = getManager().getRotationManager(orientation,position)
     local self = {
         cType = camType or CameraTypes.player,
         position = pos, 
