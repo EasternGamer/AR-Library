@@ -313,7 +313,7 @@ function Projector(camera)
                         ::disabled::
                     end
                 end
-                local t1 = getT()
+                --local t1 = getT()
                 for uiC = 1, #uiGroups do
                     local uiGroup = uiGroups[uiC]
 
@@ -496,7 +496,7 @@ function Projector(camera)
                         ::behindElement::
                     end
                 end
-                logCompute.addValue(getT()-t1)
+                --logCompute.addValue(getT()-t1)
                 ::is_nil::
             end
             if aBC > 0 then
@@ -615,9 +615,9 @@ function Projector(camera)
                 end
                 oldSelected = newSelected
             end
-            local t1 = getT()
+            --local t1 = getT()
             sort(zSorter)
-            logSort.addValue(getT()-t1)
+            --logSort.addValue(getT()-t1)
             local t1 = getT()
             for zC = zBC, 1,-1 do
                 local distance = zSorter[zC]
@@ -727,8 +727,8 @@ function Projector(camera)
                     dU = dU + 1
                 end
             end
-            logBuild.addValue(getT()-t1)
-            local t1 = getT()
+            --logBuild.addValue(getT()-t1)
+            --local t1 = getT()
             local svg = {
                 format(
                     '<svg viewbox="-%g -%g %g %g">',
@@ -746,7 +746,7 @@ function Projector(camera)
                 concat(drawStringData):format(unpack(unpackData)),
                 '</svg>'
             }
-            logCreate.addValue(getT()-t1)
+            --logCreate.addValue(getT()-t1)
             if avgZC > 0 then
                 local dpth = avgZ / avgZC
                 svgBuffer[alpha] = {dpth, concat(svg)}
