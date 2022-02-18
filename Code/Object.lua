@@ -30,7 +30,6 @@ local TEXT_ARRAY = {
     [47] = {{0, 0, 8, 12}, 10,'M%g %gL%g %g',47}, -- /
     [48] = {{0, 0, 8, 0, 8, 12, 0, 12, 0, 0, 8, 12}, 10,'M%g %gL%g %gL%g %gL%g %gZ M%g %gL%g %g',48}, -- 0
     [49] = {{5, 0, 5, 12, 3, 10}, 10,'M%g %gL%g %gL%g %g',49}, -- 1
-
     
     [50] = {{0, 12, 8, 12, 8, 7, 0, 5, 0, 0, 8, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',50}, -- 2
     [51] = {{0, 12, 8, 12, 8, 0, 0, 0, 0, 6, 8, 6}, 10,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',51}, -- 3
@@ -53,7 +52,6 @@ local TEXT_ARRAY = {
     [67] = {{8, 0, 0, 0, 0, 12, 8, 12}, 10,'M%g %gL%g %gL%g %gL%g %g',67}, -- C
     [68] = {{0, 0, 0, 12, 4, 12, 8, 8, 8, 4, 4, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %gZ',68}, -- D 
     [69] = {{8, 0, 0, 0, 0, 12, 8, 12, 0, 6, 6, 6}, 10, 'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',69}, -- E
-    
     
     [70] = {{0, 0, 0, 12, 8, 12, 0, 6, 6, 6}, 10,'M%g %gL%g %gL%g %g M%g %gL%g %g',70}, -- F
     [71] = {{6, 6, 8, 4, 8, 0, 0, 0, 0, 12, 8, 12}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',71}, -- G
@@ -88,7 +86,7 @@ local TEXT_ARRAY = {
     [123] = {{6, 0, 4, 2, 4, 10, 6, 12, 2, 6, 4, 6}, 6,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',123}, -- {
     [124] = {{4, 0, 4, 5, 4, 6, 4, 12}, 6,'M%g %gL%g %g M%g %gL%g %g',124}, -- |
     [125] = {{4, 0, 6, 2, 6, 10, 4, 12, 6, 6, 8, 6}, 6,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',125}, -- }
-    [126] = {{0, 4, 2, 8, 6, 4, 8, 8}, 10,'M%g %gL%g %gL%g %gL%g %g',126}, -- ~
+    [126] = {{0, 4, 2, 8, 6, 4, 8, 8}, 10,'M%g %gL%g %gL%g %gL%g %g',126} -- ~
 }
 
 function ObjectGroup(objects, transX, transY)
@@ -111,83 +109,76 @@ function ObjectGroup(objects, transX, transY)
     return self
 end
 
-function Object(style, position, offset, orientation, positionType, orientationType, transX, transY)
+function Object(position, orientation, positionType, orientationType)
     local rad,print,rand,manager=math.rad,system.print,math.random,getManager()
     local RotationHandler = manager.getRotationManager
-    
-    local position=position
-    local positionOffset=offset
-    
-    local style=style
-    local customGroups,uiGroups,subObjects={},{},{}
+
+    local customGroups,uiGroups={},{}
     local positionType=positionType
     local orientationType=orientationType
     local ori = {0,0,0,1}
     local objRotationHandler = RotationHandler(ori,position)
-    
+
     local defs = {}
     local self = {
-        false,false,false,customGroups,false,uiGroups,subObjects,
-        positionType, --8
-        orientationType, --9
-        ori,
-        style,
-        position,
-        offset,
-        transX,
-        transY,
-        defs
+        true, -- 1
+        customGroups, -- 2
+        uiGroups, -- 3
+        positionType, -- 4
+        orientationType, -- 5
+        ori, -- 6
+        position -- 7
     }
-    function self.addDef(string)
-        defs[#defs + 1] = string
-    end
-    function self.resetDefs()
-        defs = {}
-    end
+    function self.hide() self[1] = false end
+    function self.show() self[1] = true end
 
-    function self.setCustomSVGs(groupId,style,scale)
+    function self.setCustomSVGs(groupId)
         local multiPoint={}
         local singlePoint={}
-        local group={style,multiPoint,singlePoint}
-        local scale=scale or 1
+        local group={multiPoint,singlePoint}
+        customGroups[groupId]=group
         local mC,sC=1,1
-        self[4][groupId]=group
-        local offset=positionOffset
-        local offsetX,offsetY,offsetZ=offset[1],offset[2],offset[3]
+        
         local self={}
         function self.addMultiPointSVG()
-            local points={}
-            local data=nil
-            local drawFunction=nil
+            local mp = {}
+            local pointSetX,pointSetY,pointSetZ={},{},{}
+            
+            local mp = {false,pointSetX,pointSetY,pointSetZ,false,false}
+            multiPoint[mC]=mp
+            mC=mC+1
             local self={}
             local pC=1
+            function self.show() mp[1] = true end
+            function self.hide() mp[1] = false end
             function self.addPoint(point)
-                local point=point
-                points[pC]={point[1]/scale+offsetX,point[2]/scale-offsetY,point[3]/scale-offsetZ}
+                pointSetX[pC]=point[1]
+                pointSetY[pC]=point[2]
+                pointSetZ[pC]=point[3]
                 pC=pC+1
                 return self
             end
-            function self.bulkSetPoints(bulk)
-                points=bulk
+            function self.setPoints(bulk)
+                for i=1,#bulk do
+                    local point = bulk[i]
+                    pointSetX[i]=point[1]
+                    pointSetY[i]=point[2]
+                    pointSetZ[i]=point[3]
+                end
                 pC=#points+1
                 return self
             end
-            function self.setData(dat)
-                data=dat
+            function self.setDrawFunction(draw)
+                mp[5] = draw
                 return self
             end
-            function self.setDrawFunction(draw)
-                drawFunction=draw
+            function self.setData(dat)
+                mp[6] = dat
                 return self
             end
             function self.build()
                 if pC > 1 then
-                    if drawFunction ~= nil then
-                        multiPoint[mC]={points, drawFunction, data}
-                        mC=mC+1
-                        return points
-                    else print("WARNING! Malformed multi-point build operation, no draw function specified. Ignoring.")
-                    end
+                   mp[1] = true
                 else print("WARNING! Malformed multi-point build operation, no points specified. Ignoring.")
                 end
             end
@@ -199,7 +190,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
             singlePoint[sC]= outArr
             sC=sC+1
             function self.setPosition(position)
-                outArr[2],outArr[3],outArr[4]=position[1]/scale+offsetX,position[2]/scale-offsetY,position[3]/scale-offsetZ
+                outArr[2],outArr[3],outArr[4]=position[1],position[2],position[3]
                 return self
             end
             function self.setDrawFunction(draw)
@@ -210,10 +201,8 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 outArr[6] = dat
                 return self
             end
-            function self.setEnabled(enabled)
-                outArr[1] = enabled
-                return self
-            end
+            function self.show() outArr[1] = true end
+            function self.hide() outArr[1] = false end
             function self.build()
                 outArr[1] = true
                 return self
@@ -222,36 +211,30 @@ function Object(style, position, offset, orientation, positionType, orientationT
         end
         return self
     end
-    function self.setUIElements(style, groupId)
+    function self.setUIElements(groupId)
         groupId = groupId or 1
-        local sqrt,s,c,remove,unpack = math.sqrt, math.sin, math.cos, table.remove,table.unpack
+        local remove,unpack = table.remove,table.unpack
 
         local function createNormal(points, rx, ry, rz, rw)
             if #points < 3 then
                 print("Invalid Point Set!")
-                do
-                    return
-                end
+                return false,false,false
             end
             return 2*(rx*ry-rz*rw),1-2*(rx*rx+rz*rz),2*(ry*rz+rx*rw)
         end
         local function createBounds(pointsX,pointsY)
-            
             local size = #pointsX
-            if size >= 60 then
-                return false
-            end
+            if size >= 60 then return false end
             return {{unpack(pointsX)},{unpack(pointsY)}}
         end
         
         local elements = {}
         local modelElements = {}
         local elementClasses = {}
-        local selectedElement = false
         
-        local group = {style, elements, selectedElement,modelElements}
+        local group = {elements,modelElements}
 
-        self[6][groupId] = group
+        uiGroups[groupId] = group
 
         local self = {}
         local pC, eC = 0, 0
@@ -270,8 +253,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
             local resultantPos = {x,y+rand()*0.000001,z}
             local mRot = RotationHandler(mainRotation,resultantPos)
             
-            --system.print(string.format('UI Create {%.2f,%.2f,%.2f}', resultantPos[1],resultantPos[2],resultantPos[3]))
-            local elementData = {false, false, false, actions, false, true, false, false, pointSetX, pointSetY, resultantPos, false,false,false,false, mainRotation,mRot}
+            local elementData = {false, false, false, actions, 1, true, false, false, pointSetX, pointSetY, resultantPos, false,false,false,false, mainRotation,mRot}
             local subElements = {}
             local elementIndex = eC + 1
             elements[elementIndex] = elementData
@@ -295,31 +277,21 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 return elementIndex
             end
             local function handleBound(x,y)
-                if x > maxX then
-                    maxX = x
-                end
-                if x < minX then
-                    minX = x
-                end
-                if y > maxY then
-                    maxY = y
-                end
-                if y < minY then
-                    minY = y
-                end
+                if x > maxX then maxX = x end
+                if x < minX then minX = x end
+                if y > maxY then maxY = y end
+                if y < minY then minY = y end
             end
             function user.addPoint(x,y)
                 local pC = #pointSet+1
                 if x and y then
                     handleBound(x,y)
-                    pointSetX[pC] = x
-                    pointSetY[pC] = y
+                    pointSetX[pC],pointSetY[pC] = x,y
                 else
                     if type(x) == 'table' and #x > 0 then
                         local x,y = x[1], x[2]
                         handleBound(x,y)
-                        pointSetX[pC] = x
-                        pointSetY[pC] = y
+                        pointSetX[pC],pointSetY[pC] = x,y
                     else
                         print('Invalid format for point.')
                     end
@@ -332,8 +304,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
                     elementData[9],elementData[10] = pntsX,pntsY
                     pointSetX,pointSetY = pntsX,pntsY
                 else
-                    pntsX,pntsY = elementData[9],elementData[10]
-                    pointSetX,pointSetY = pntsX,pntsY
+                    pntsX,pntsY = pointSetX,pointSetY
                 end
                 if points then
                     local pointCount = #points
@@ -347,8 +318,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
                                 local x,y = points[i],points[i+1]
                                 handleBound(x,y)
                                 
-                                pntsX[index] = x
-                                pntsY[index] = y
+                                pntsX[index],pntsY[index] = x,y
                             end
                         elseif pType == 'table' then
                             
@@ -360,8 +330,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
                                 local x,y = point[1],point[2]
                                 handleBound(x,y)
                                 
-                                pntsX[index] = x
-                                pntsY[index] = y
+                                pntsX[index],pntsY[index] = x,y
                             end
                         else
                             print('No compatible format found.')
@@ -456,8 +425,8 @@ function Object(style, position, offset, orientation, positionType, orientationT
                     print('ERROR: No indices specified!')
                 else
                     if not ogPointSetX then
-                        ogPointSetX = {table.unpack(pointSetX)}
-                        ogPointSetY = {table.unpack(pointSetY)}
+                        ogPointSetX = {unpack(pointSetX)}
+                        ogPointSetY = {unpack(pointSetY)}
                     end
                     for i=1,#indices do
                         local index = indices[i]
@@ -476,18 +445,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
             end
             
             function user.setDrawOrder(indices)
-                local drawOrder = {}
-                for i=1, #indices do
-                    local index = indices[i]
-                    
-                    local order = drawOrder[index]
-                    if not order then
-                        order = {}
-                        drawOrder[index] = order
-                    end
-                    order[#order+1] = i
-                end
-                elementData[7] = drawOrder
+                elementData[7] = indices
             end
             
             function user.setDrawData(drawData) elementData[8] = drawData end
@@ -503,9 +461,6 @@ function Object(style, position, offset, orientation, positionType, orientationT
             
             function user.getPoints() return elementData[9],elementData[10] end
             
-            function user.setDrawOrder(drawOrder) elementData[7] = drawOrder end
-            function user.setDrawData(drawData) elementData[8] = drawData end
-            
             function user.setPoints(pointsX,pointsY) 
                 if not pointsY then 
                     user.addPoints(pointsX,true)
@@ -519,9 +474,7 @@ function Object(style, position, offset, orientation, positionType, orientationT
             function user.getElementIndex(eI) return elementIndex end
             
             function user.setNormal(nx,ny,nz)
-                elementData[12] = nx
-                elementData[13] = ny
-                elementData[14] = nz
+                elementData[12],elementData[13],elementData[14] = nx,ny,nz
             end
             
             function user.setBounds(bounds)
@@ -575,9 +528,10 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 txt = text
                 local result = {byte(upper(text), 1, #text)}
                 textCache = {}
+                local text_array = TEXT_ARRAY
                 for k = 1, #result do
                     local charCode = result[k]
-                    textCache[k] = TEXT_ARRAY[charCode]
+                    textCache[k] = text_array[charCode]
                 end
             end
             local function buildOffsetCache()
@@ -680,7 +634,6 @@ function Object(style, position, offset, orientation, positionType, orientationT
             function userFunc.setText(text)
                 buildTextCache(text)
                 buildOffsetCache()
-                
                 buildPoints()
             end
             
@@ -849,21 +802,11 @@ function Object(style, position, offset, orientation, positionType, orientationT
                     pointsY[ePI] = pointsY[sPI] + c[2] * progress
                 end
             end
-            function userFuncOut.setFillPoints(points)
-                userFuncFill.addPoints(points)
-            end
-            function userFuncOut.getFillDrawData()
-               return userFuncFill.getDrawData() 
-            end
-            function userFuncOut.setFillDrawData(drawData)
-                userFuncFill.setDrawData(drawData)
-            end
-            function userFuncOut.setFillDraw(draw)
-                userFuncFill.setDefaultDraw(draw)
-            end
-            function userFuncOut.setFillOffsetPosition(tx,ty,tz)
-                userFuncFill.setPosition(tx,ty,tz)
-            end
+            userFuncOut.setFillPoints = userFuncFill.addPoints
+            userFuncOut.getFillDrawData = userFuncFill.getDrawData
+            userFuncOut.setFillDrawData = userFuncFill.setDrawData
+            userFuncOut.setFillDraw = userFuncFill.setDefaultDraw
+            userFuncOut.setFillOffsetPosition = userFuncFill.setPosition
             
             return userFuncOut
         end
@@ -877,12 +820,15 @@ function Object(style, position, offset, orientation, positionType, orientationT
             local faces = {}
             
             local actions = {false,false,false,false,false,false}
-            local elementData = {is3D = true, false, false, false, actions, false, true, false, false, pointSet, x, y, z,faces}
+            
+            local elementData = {is3D = true, false, false, false, actions, 1, true, false, false, pointSet, x, y, z,faces}
             local eC = mElementIndex + 1
             mElementIndex = eC
             local mElementIndex = eC
             modelElements[eC] = elementData
-            
+            function userFunc.setScale(scale) 
+                elementData[5] = scale
+            end
             function userFunc.addPoints(points,ref)
                 local pntX,pntY,pntZ,rotation = pointSet[1],pointSet[2],pointSet[3],pointSet[4]
                 local s1,s2 = #pntX, #points
@@ -936,7 +882,6 @@ function Object(style, position, offset, orientation, positionType, orientationT
                             sCount = sCount + 1
                         end
                         string[sCount] = 'Z"/>'
-                        --local pn1 = pointIndices[1]
                         
                         return {pX/count,pY/count,pZ/count,nx,ny,nz,pointIndices,r,g,b,concat(string)},oData
                     end
@@ -953,73 +898,41 @@ function Object(style, position, offset, orientation, positionType, orientationT
                 end
             end
             
-            function userFunc.setScale()
-            end
             function userFunc.setDrawData(drawData) elementData[8] = drawData end
             
             return userFunc
-        end
-        function self.createSlider(uiElement, center)
-            local self = {}
-            return self
         end
         return self
     end
     
     objRotationHandler.assignFunctions(self)
-    
+    self.rotateXYZ(orientation)
     function self.addSubObject(object)
-        objRotationHandler.addSubRotation(object.getRotationManager())
+        return objRotationHandler.addSubRotation(object.getRotationManager())
     end
     function self.removeSubObject(id)
-        self[6][id]={}
-    end
-    
-    function self.setSubObjects()
-        local self={}
-        local c=1
-        function self.addSubObject(object)
-            self[6][c]=object
-            c=c+1
-            return self
-        end
-        return self
+        objRotationHandler.removeSubRotation(id)
     end
     
     return self
 end
 
 function ObjectBuilderLinear()
-    local self={}
-    function self.setStyle(style)
-        local self={}
-        local style=style
-        function self.setPosition(pos)
-            local self={}
-            local pos=pos
-            function self.setOffset(offset)
-                local self={}
-                local offset=offset
-                function self.setOrientation(orientation)
-                    local self={}
-                    local orientation=orientation
-                    function self.setPositionType(positionType)
-                        local self={}
-                        local positionType=positionType
-                        function self.setOrientationType(orientationType)
-                            local self={}
-                            local orientationType = orientationType
-                            local transX,transY=nil,nil
-                            function self.setTranslation(translateX,translateY)
-                                transX,transY=translateX,translateY
-                                return self
-                            end
-                            function self.build()
-                                return Object(style,pos,offset,orientation,positionType,orientationType,transX,transY)
-                            end
-                            return self
-                        end
-                        return self
+    local self = {}
+    function self.setPosition(pos)
+        local self = {}
+        local pos = pos
+        function self.setOrientation(orientation)
+            local self = {}
+            local orientation = orientation
+            function self.setPositionType(positionType)
+                local self = {}
+                local positionType = positionType
+                function self.setOrientationType(orientationType)
+                    local self = {}
+                    local orientationType = orientationType
+                    function self.build()
+                        return Object(pos, orientation, positionType, orientationType)
                     end
                     return self
                 end
@@ -1031,3 +944,4 @@ function ObjectBuilderLinear()
     end
     return self
 end
+

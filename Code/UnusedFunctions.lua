@@ -997,3 +997,49 @@ function self.createTableDraw(tx, ty, tz)
         cRX, cRY, cRZ, cFX, cFY, cFZ, cUX, cUY, cUZ = cR[1], cR[2], cR[3], cF[1], cF[2], cF[3], cU[1], cU[2], cU[3]
         sx, sy, sz, sw = matrixToQuat(cRX, cRY, cRZ, cFX, cFY, cFZ, cUX, cUY, cUZ)
     end
+	local oldX,oldY,oldZ,oldW
+    local cLX,cLY,cLZ,cLW
+    local lfT,lFT = 0,0
+    local function lrp(ax,ay,az,aw, bx,by,bz,bw, s)
+        local nX = ax + (ax-bx)*s
+        local nY = ay + (ay-by)*s
+        local nZ = az + (az-bz)*s
+        local nW = aw + (aw-bw)*s
+        local norm = (nX*nX+nY*nY+nZ*nZ+nW*nW)^(0.5)
+	   return nX/norm,nY/norm,nZ/norm,nW/norm
+    end
+    
+    function slerp(ax,ay,az,aw, bx,by,bz,bw, s)
+        local dot = ax*bx+ay*by+az*bz+aw*bw
+        --system.print(dot)
+	   if dot < 0 then
+            a = -a
+            dot = -dot
+        end
+        --utils.clamp(dot, -1, 1)
+        local theta = -math.acos(dot) * s
+        --system.print(math.deg(theta))
+        local cx,cy,cz,cw = bx-ax*dot,by-ay*dot,bz-az*dot,bw-aw*dot
+        local norm = (cx*cx+cy*cy+cz*cz+cw*cw)^(0.5)
+        local cosTheta,sinTheta=math.cos(theta),math.sin(theta)
+        return ax * cosTheta + cx/norm * sinTheta,ay * cosTheta + cy/norm * sinTheta,az * cosTheta + cz/norm * sinTheta,aw * cosTheta + cw/norm * sinTheta
+    end
+	local tmpX,tmpY,tmpZ,tmpW = vx, vy, vz, vw
+        if oldX and (lerp == 1 or lerp == 2) then
+            if lerp==1 then
+                vx,vy,vz,vw = lrp(vx,vy,vz,vw,oldX,oldY,oldZ,oldW,1)
+            elseif lerp == 2 then
+                vx,vy,vz,vw = slerp(vx,vy,vz,vw,oldX,oldY,oldZ,oldW,1)
+            end
+            vx1, vy1, vz1, vx2, vy2, vz2, vx3, vy3, vz3 = quatToMatrix(vx,vy,vz,vw)
+            vw1, vw2, vw3 = -(vx1 * lCX + vy1 * lCY + vz1 * lCZ), 
+                            -(vx2 * lCX + vy2 * lCY + vz2 * lCZ), 
+                            -(vx3 * lCX + vy3 * lCY + vz3 * lCZ)
+        end
+        oldX,oldY,oldZ,oldW = tmpX,tmpY,tmpZ,tmpW
+		local function quatToMatrix(x,y,z,w)
+        local mXX, mXY, mXZ = 1 - 2*(y*y + z*z),2*(x*y + z*w),2*(x*z - y*w)
+        local mYX, mYY, mYZ = 2*(x*y - z*w),1 - 2*(x*x + z*z),2*(y*z + x*w)
+        local mZX, mZY, mZZ = 2*(x*z + y*w),2*(y*z - x*w),1 - 2*(x*x + y*y)
+        return mXX, mXY, mXZ,mYX, mYY, mYZ,mZX, mZY, mZZ
+    end

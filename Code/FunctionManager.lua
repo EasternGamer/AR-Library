@@ -104,7 +104,6 @@ function getManager()
         --Primary Processing Functions--
         --============================--
         local function process(wx,wy,wz,ww,lX,lY,lZ,lTX,lTY,lTZ)
-            --local timeStart = system.getTime()
             wx,wy,wz,ww = wx or 0, wy or 0, wz or 0, ww or 1
             lX,lY,lZ = lX or pX, lY or pY, lZ or pZ
             lTX,lTY,lTZ = lTX or pX, lTY or pY, lTZ or pZ
@@ -143,9 +142,11 @@ function getManager()
             end
             out_rotation[1],out_rotation[2],out_rotation[3],out_rotation[4] = wx,wy,wz,ww
             for i=1, #subRotations do
-                subRotations[i].update(wx,wy,wz,ww,pX,pY,pZ,wXYZ[1],wXYZ[2],wXYZ[3])
+                local sub = subRotations[i]
+                if sub then
+                    sub.update(wx,wy,wz,ww,pX,pY,pZ,wXYZ[1],wXYZ[2],wXYZ[3])
+                end
 	       end
-            --local endTime = system.getTime()
             needsUpdate = false
         end
         out.update = process 
@@ -170,9 +171,21 @@ function getManager()
         end
     
         function out.addSubRotation(rotManager)
+            local id = #subRotations + 1
             rotManager.setSuperManager(out)
-            subRotations[#subRotations + 1] = rotManager
+            subRotations[id] = rotManager
             process()
+            return id
+        end
+        function out.removeSubRotation(id)
+            local sub = subRotations[id]
+            if sub then
+                sub.setSuperManager(false)
+                sub.update()
+                subRotations[id] = false
+            else
+                print('No sub rotation of that ID.')
+            end
         end
         
         function out.bubble()
