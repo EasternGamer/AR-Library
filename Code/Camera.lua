@@ -14,6 +14,7 @@ CameraTypes={
         id = 2
     }
 }
+
 function Camera(camType, position, orientation)
     
     local rad=math.rad

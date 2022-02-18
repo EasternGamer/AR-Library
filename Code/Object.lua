@@ -112,7 +112,7 @@ end
 function Object(position, orientation, positionType, orientationType)
     local rad,print,rand,manager=math.rad,system.print,math.random,getManager()
     local RotationHandler = manager.getRotationManager
-
+    
     local customGroups,uiGroups={},{}
     local positionType=positionType
     local orientationType=orientationType
@@ -136,6 +136,7 @@ function Object(position, orientation, positionType, orientationType)
         local multiPoint={}
         local singlePoint={}
         local group={multiPoint,singlePoint}
+        local groupId = groupId or #customGroups+1
         customGroups[groupId]=group
         local mC,sC=1,1
         
@@ -921,16 +922,12 @@ function ObjectBuilderLinear()
     local self = {}
     function self.setPosition(pos)
         local self = {}
-        local pos = pos
         function self.setOrientation(orientation)
             local self = {}
-            local orientation = orientation
             function self.setPositionType(positionType)
                 local self = {}
-                local positionType = positionType
                 function self.setOrientationType(orientationType)
                     local self = {}
-                    local orientationType = orientationType
                     function self.build()
                         return Object(pos, orientation, positionType, orientationType)
                     end
@@ -944,4 +941,5 @@ function ObjectBuilderLinear()
     end
     return self
 end
+
 
