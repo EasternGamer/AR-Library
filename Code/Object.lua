@@ -28,17 +28,17 @@ local TEXT_ARRAY = {
     [45] = {{2, 6, 6, 6}, 10,'M%g %gL%g %g',45}, -- -
     [46] = {{0, 0, 1, 0}, 3,'M%g %gL%g %g',46}, -- .
     [47] = {{0, 0, 8, 12}, 10,'M%g %gL%g %g',47}, -- /
-    [48] = {{0, 0, 8, 0, 8, 12, 0, 12, 0, 0, 8, 12}, 10,'M%g %gL%g %gL%g %gL%g %gZ M%g %gL%g %g',48}, -- 0
+    [48] = {{1, 0, 9, 0, 9, 12, 1, 12, 1, 0, 9, 12}, 10,'M%g %gL%g %gL%g %gL%g %gZ M%g %gL%g %g',48}, -- 0
     [49] = {{5, 0, 5, 12, 3, 10}, 10,'M%g %gL%g %gL%g %g',49}, -- 1
     
-    [50] = {{0, 12, 8, 12, 8, 7, 0, 5, 0, 0, 8, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',50}, -- 2
-    [51] = {{0, 12, 8, 12, 8, 0, 0, 0, 0, 6, 8, 6}, 10,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',51}, -- 3
-    [52] = {{0, 12, 0, 6, 8, 6, 8, 12, 8, 0}, 10,'M%g %gL%g %gL%g %g M%g %gL%g %g',52}, -- 4
-    [53] = {{0, 0, 8, 0, 8, 6, 0, 7, 0, 12, 8, 12}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',53}, -- 5
-    [54] = {{0, 12, 0, 0, 8, 0, 8, 5, 0, 7}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %g',54}, -- 6
-    [55] = {{0, 12, 8, 12, 8, 6, 4, 0}, 10,'M%g %gL%g %gL%g %gL%g %g',55}, -- 7
-    [56] = {{0, 0, 8, 0, 8, 12, 0, 12, 0, 6, 8, 6}, 10,'M%g %gL%g %gL%g %gL%g %gZ M%g %gL%g %g',56}, -- 8
-    [57] = {{8, 0, 8, 12, 0, 12, 0, 7, 8, 5}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %g',57}, -- 9
+    [50] = {{1, 12, 9, 12, 9, 7, 1, 5, 1, 0, 9, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',50}, -- 2
+    [51] = {{1, 12, 9, 12, 9, 0, 1, 0, 1, 6, 9, 6}, 10,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',51}, -- 3
+    [52] = {{1, 12, 1, 6,  9, 6, 9,12, 9, 0}, 10,'M%g %gL%g %gL%g %g M%g %gL%g %g',52}, -- 4
+    [53] = {{1, 0,  9, 0,  9, 6, 1, 7, 1, 12, 9, 12}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',53}, -- 5
+    [54] = {{1, 12, 1, 0,  9, 0, 9, 5, 1, 7}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %g',54}, -- 6
+    [55] = {{1, 12, 9, 12, 9, 6, 5, 0}, 10,'M%g %gL%g %gL%g %gL%g %g',55}, -- 7
+    [56] = {{1, 0, 9, 0, 9, 12, 1, 12, 1, 6, 9, 6}, 10,'M%g %gL%g %gL%g %gL%g %gZ M%g %gL%g %g',56}, -- 8
+    [57] = {{9, 0, 9, 12, 1, 12, 1, 7, 9, 5}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %g',57}, -- 9
     [58] = {{4, 9, 4, 7, 4, 5, 4, 3}, 2,'M%g %gL%g %g M%g %gL%g %g',58}, -- :
     [59] = {{4, 9, 4, 7, 4, 5, 1, 2}, 5,'M%g %gL%g %g M%g %gL%g %g',59}, -- ;
     
@@ -91,7 +91,7 @@ local TEXT_ARRAY = {
 
 function ObjectGroup(objects, transX, transY)
     local objects=objects or {}
-    local self={style='',gStyle='',objects=objects,transX=transX,transY=transY,enabled=true,glow=false,gRad=10,scale = false}
+    local self={style='',gStyle='',objects=objects,transX=transX,transY=transY,enabled=true,glow=false,gRad=10,scale = false,isZSorting=true}
     function self.addObject(object, id)
         local id=id or #objects+1
         objects[id]=object
@@ -102,7 +102,7 @@ function ObjectGroup(objects, transX, transY)
     function self.hide() self.enabled = false end
     function self.show() self.enabled = true end
     function self.isEnabled() return self.enabled end
-    
+    function self.setZSort(isZSorting) self.isZSorting = isZSorting end
     function self.setStyle(style) self.style = style end
     function self.setGlowStyle(gStyle) self.gStyle = gStyle end
     function self.setGlow(enable,radius,scale) self.glow = enable; self.gRad = radius or self.gRad; self.scale = scale or false end 
@@ -112,7 +112,7 @@ end
 function Object(position, orientation, positionType, orientationType)
     local rad,print,rand,manager=math.rad,system.print,math.random,getManager()
     local RotationHandler = manager.getRotationManager
-    
+
     local customGroups,uiGroups={},{}
     local positionType=positionType
     local orientationType=orientationType
@@ -136,11 +136,21 @@ function Object(position, orientation, positionType, orientationType)
         local multiPoint={}
         local singlePoint={}
         local group={multiPoint,singlePoint}
-        local groupId = groupId or #customGroups+1
         customGroups[groupId]=group
         local mC,sC=1,1
         
         local self={}
+        local function setState(group, state)
+            for i=1, #group do
+                group[i][1] = state
+            end
+        end
+        function self.hideSingle() setState(singlePoint,false) end
+        function self.hideMulti() setState(multiPoint,false) end
+        function self.showSingle() setState(singlePoint,true) end
+        function self.showMulti() setState(multiPoint,true) end
+        function self.show() setState(multiPoint,true); setState(singlePoint,true) end
+        function self.hide() setState(multiPoint,false); setState(singlePoint,false) end
         function self.addMultiPointSVG()
             local mp = {}
             local pointSetX,pointSetY,pointSetZ={},{},{}
@@ -223,10 +233,19 @@ function Object(position, orientation, positionType, orientationType)
             end
             return 2*(rx*ry-rz*rw),1-2*(rx*rx+rz*rz),2*(ry*rz+rx*rw)
         end
-        local function createBounds(pointsX,pointsY)
+        local function createBounds(pointsX,pointsY,scale)
             local size = #pointsX
             if size >= 60 then return false end
-            return {{unpack(pointsX)},{unpack(pointsY)}}
+            if scale == 1 then
+                return {{unpack(pointsX)},{unpack(pointsY)}}
+            else
+                local bPointsX,bPointsY = {},{}
+                for i=1,size do
+                    bPointsX[i] = pointsX[i]*scale
+                    bPointsY[i] = pointsY[i]*scale
+                end
+                return {bPointsX,bPointsY}
+            end
         end
         
         local elements = {}
@@ -247,6 +266,7 @@ function Object(position, orientation, positionType, orientationType)
             
             local huge = math.huge
             local maxX,minX,maxY,minY = -huge,huge,-huge,huge
+            local boundScale = 1
             
             local pointSetX,pointSetY = {},{}
             local actions = {false,false,false,false,false,false,false}
@@ -345,11 +365,12 @@ function Object(position, orientation, positionType, orientationType)
             end
             
             local function updateNormal()
-                if elementData[15] then
-                    user.setNormal(createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4]))
+                for i=1, #subElements do
+                    subElements[i].updateNormal()
                 end
+                user.setNormal(createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4]))
             end
-            
+            user.updateNormal = updateNormal
             mRot.assignFunctions(user, updateNormal)
 
             local function drawChecks()
@@ -400,7 +421,7 @@ function Object(position, orientation, positionType, orientationType)
             local psX,psY = 0,0
             function user.move(sx,sy,indices,updateHitbox)
                 if not indices then
-                    for i = 1, #pointSet do
+                    for i = 1, #pointSetX do
                         pointSetX[i] = pointSetX[i] - psX + sx
                         pointSetY[i] = pointSetY[i] - psY + sy
                     end
@@ -411,13 +432,12 @@ function Object(position, orientation, positionType, orientationType)
                         pointSetX[index] = pointSetX[index] - psX + sx
                         pointSetY[index] = pointSetY[index] - psY + sy
                     end
-                    -- TODO: Check min-max values and update accordingly
                 end
                 psX = sx
                 psY = sy
                 
                 if updateHitbox then
-                    user.setBounds(createBounds(pointSetX))
+                    user.setBounds(createBounds(pointSetX,pointSetY,boundScale))
                 end
             end
             local ogPointSetX,ogPointSetY
@@ -441,7 +461,7 @@ function Object(position, orientation, positionType, orientationType)
                     end
                 end
                 if updateHitbox then
-                    user.setBounds(createBounds(pointSetX,pointSetY))
+                    user.setBounds(createBounds(pointSetX,pointSetY,boundScale))
                 end
             end
             
@@ -482,6 +502,9 @@ function Object(position, orientation, positionType, orientationType)
                 elementData[15] = bounds
             end
             
+            function user.setBoundsScale(bScale)
+                boundScale = bScale
+            end
             function user.build(force, hasBounds)
                 
                 local nx, ny, nz = createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4])
@@ -490,7 +513,7 @@ function Object(position, orientation, positionType, orientationType)
                         user.setNormal(nx,ny,nz)
                         if not force then
                             if hasBounds or hasBounds == nil then
-                                user.setBounds(createBounds(pointSetX,pointSetY))
+                                user.setBounds(createBounds(pointSetX,pointSetY,boundScale))
                             else
                                 user.setBounds(false)
                             end
@@ -518,7 +541,7 @@ function Object(position, orientation, positionType, orientationType)
             local maxX,minX,maxY,minY = userFunc.getMaxValues()
             
             userFunc.setDrawData(drawData)
-            
+            local oldMax = userFunc.getMaxValues
             function userFunc.getMaxValues()
                 return maxX,minX,maxY,minY
             end
@@ -597,12 +620,12 @@ function Object(position, orientation, positionType, orientationType)
                 local offsetY = offsetCacheY
                 local woffsetX,offsetXCounter = offsetCacheX[1],1
                 local fontSize = drawData.sizes[1] / wScale
-
+                
                 local pointsX,pointsY,drawStrings = {},{},{'<path stroke-width="%gpx" stroke="%s" stroke-opacity="%g" fill="none" d="'}
                 local count = 1
                 
                 local textCacheSize = #textCache
-                
+                maxX,minX,maxY,minY = oldMax()
                 for k = 1, textCacheSize do
                     local char = textCache[k]
                     drawStrings[k + 1] = char[3]
@@ -689,7 +712,7 @@ function Object(position, orientation, positionType, orientationType)
             local userFunc,button = createUITemplate(bx, by, bz)
             local txtFuncs
             function userFunc.setText(text,rx, ry, rz)
-                rx,ry,rz = rx or 0, ry or -0.01, rz or 0
+                rx,ry,rz = rx or 0, ry or -0.001, rz or 0
                 if not txtFuncs then
                     txtFuncs = self.createText(bx+rx, by+ry, bz+rz)
                     userFunc.addSubElement(txtFuncs)
@@ -707,12 +730,22 @@ function Object(position, orientation, positionType, orientationType)
                 local r1,r2 = theight/cheight,twidth/cwidth
                 if r1 < r2 then
                     local size = theight/r2
-                    txtFuncs.setFontSize((size)*0.75)
+                    txtFuncs.setFontSize((size)*0.85)
                 else
                     local size = theight/r1
                     txtFuncs.setFontSize((size)*0.75)
                 end
                 return txtFuncs
+            end
+            function userFunc.getText()
+                return txtFuncs.getText()
+            end
+            local oldMove = userFunc.move
+            function userFunc.move(sx,sy,indices,updateHitbox)
+                oldMove(sx,sy,indices,updateHitbox)
+                if txtFuncs then
+                    txtFuncs.move(sx,sy)
+                end
             end
             return userFunc
         end
@@ -922,12 +955,16 @@ function ObjectBuilderLinear()
     local self = {}
     function self.setPosition(pos)
         local self = {}
+        local pos = pos
         function self.setOrientation(orientation)
             local self = {}
+            local orientation = orientation
             function self.setPositionType(positionType)
                 local self = {}
+                local positionType = positionType
                 function self.setOrientationType(orientationType)
                     local self = {}
+                    local orientationType = orientationType
                     function self.build()
                         return Object(pos, orientation, positionType, orientationType)
                     end
@@ -941,5 +978,3 @@ function ObjectBuilderLinear()
     end
     return self
 end
-
-

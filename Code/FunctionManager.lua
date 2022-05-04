@@ -224,13 +224,13 @@ function getManager()
                     if type(rotX) == 'table' then
                         if #rotX == 3 then
                             tix,tiy,tiz,tiw = rotX[1],rotX[2],rotX[3],nil
+                            rotate(false)
                             if specialCall then specialCall() end
                             goto valid  
                         end
                     end
                     print('Invalid format. Must be three angles, or right, forward and up vectors, or a quaternion. Use radians if angles.')
                     ::valid::
-
                 end
                 
             end
@@ -248,6 +248,7 @@ function getManager()
                     if type(rotX) == 'table' then
                         if #rotX == 3 then
                             tdx,tdy,tdz,tdw = rotX[1],rotX[2],rotX[3],nil
+                            rotate(true);
                             if specialCall then specialCall() end
                             goto valid  
                         end
