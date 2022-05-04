@@ -136,6 +136,7 @@ function Object(position, orientation, positionType, orientationType)
         local multiPoint={}
         local singlePoint={}
         local group={multiPoint,singlePoint}
+		local groupId = groupId or #customGroups+1
         customGroups[groupId]=group
         local mC,sC=1,1
         
