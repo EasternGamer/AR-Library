@@ -170,13 +170,13 @@ function Projector(camera)
             self.getViewMatrix()
         local vx, vy, vz, vw = matrixToQuat(vx1, vy1, vz1, vx2, vy2, vz2, vx3, vy3, vz3)
         
-        local atan, sort, format, unpack, concat, getModelMatrix =
+        local atan, sort, format, unpack, concat, getModelMatrix, select =
             atan,
             table.sort,
             string.format,
             table.unpack,
             table.concat,
-            self.getModelMatrix
+            self.getModelMatrix, select
         local nFactor = 2
         local width,height = getWidth()/nFactor, getHeight()/nFactor
         local aspect = width/height
@@ -648,19 +648,26 @@ function Projector(camera)
                     local drawOrder = el[7]
                     local drawData = el[8]
                     local pointsX,pointsY = el[9],el[10]
-
+                    
+                    local inputNumber = select(2, drawForm:gsub("%%", ""))
                     local oUC = uC
                     if drawData then
-                        local sizes = drawData["sizes"]
+                        local sizes = drawData.sizes
                         if sizes then
-                            uC = uC + #sizes
+                            local size = #sizes
+                            uC = uC + size
+                            inputNumber = inputNumber - size
                         end
-                        uC = uC + #drawData
+                        local drawDataSize = #drawData
+                        uC = uC + drawDataSize
+                        inputNumber = inputNumber - drawDataSize
                     end
-
+                    inputNumber = inputNumber * 0.5
                     local broken = false
+                    local pointCount = #pointsX
+                    local ePC = 1
                     if not drawOrder then
-                        for ePC = 1, #pointsX do
+                        while (ePC <=pointCount and ePC <= inputNumber) do
                             local ex, ez = pointsX[ePC]*scale, pointsY[ePC]*scale
 
                             local pz = yxMult*ex + yzMult*ez + ywAdd
@@ -675,9 +682,10 @@ function Projector(camera)
                             unpackData[uC] = (xxMult*ex + xzMult*ez + xwAdd) / pz
                             unpackData[uC + 1] = (zxMult*ex + zzMult*ez + zwAdd) / pz
                             uC = uC + 2
+                            ePC = ePC + 1
                         end
                     else
-                        for ePC = 1, #pointsX do
+                        while (ePC <=pointCount and ePC <= inputNumber) do
                             local ex, ez = pointsX[ePC]*scale, pointsY[ePC]*scale
 
                             local pz = yxMult*ex + yzMult*ez + ywAdd

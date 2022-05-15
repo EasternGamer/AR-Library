@@ -24,10 +24,10 @@ local TEXT_ARRAY = {
     [41] = {{2, 0, 6, 4, 6, 8, 2, 12}, 8,'M%g %gL%g %gL%g %gL%g %g',41}, --)
     [42] = {{0, 0, 4, 12, 8, 0, 0, 8, 8, 8, 0, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',42}, --*
     [43] = {{1, 6, 7, 6, 4, 9, 4, 3}, 10,'M%g %gL%g %gM%g %gL%g %g',43}, -- +
-    [44] = {{-1, -2, 1, 1}, 4,'M%g %gL%g %g',44}, -- ,
+    [44] = {{0, -2, 2, 1}, 4,'M%g %gL%g %g',44}, -- ,
     [45] = {{2, 6, 6, 6}, 10,'M%g %gL%g %g',45}, -- -
     [46] = {{0, 0, 1, 0}, 3,'M%g %gL%g %g',46}, -- .
-    [47] = {{0, 0, 8, 12}, 10,'M%g %gL%g %g',47}, -- /
+    [47] = {{2, 0, 10, 12}, 12,'M%g %gL%g %g',47}, -- /
     [48] = {{1, 0, 9, 0, 9, 12, 1, 12, 1, 0, 9, 12}, 10,'M%g %gL%g %gL%g %gL%g %gZ M%g %gL%g %g',48}, -- 0
     [49] = {{5, 0, 5, 12, 3, 10}, 10,'M%g %gL%g %gL%g %g',49}, -- 1
     
@@ -77,7 +77,7 @@ local TEXT_ARRAY = {
     
     [90] = {{0, 12, 8, 12, 0, 0, 8, 0, 2, 6, 6, 6}, 10,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',90}, -- Z
     [91] = {{6, 0, 2, 0, 2, 12, 6, 12}, 6,'M%g %gL%g %gL%g %gL%g %g',91}, -- [
-    [92] = {{0, 12, 8, 0}, 10,'M%g %gL%g %g',92}, -- \
+    [92] = {{1, 12, 9, 0}, 10,'M%g %gL%g %g',92}, -- \
     [93] = {{2, 0, 6, 0, 6, 12, 2, 12}, 6,'M%g %gL%g %gL%g %gL%g %g',93}, -- ]
     [94] = {{2, 6, 4, 12, 6, 6}, 6,'M%g %gL%g %gL%g %g',94}, -- ^
     [95] = {{0, 0, 8, 0}, 10,'M%g %gL%g %g',95}, -- _
@@ -229,7 +229,7 @@ function Object(position, orientation, positionType, orientationType)
 
         local function createNormal(points, rx, ry, rz, rw)
             if #points < 3 then
-                print("Invalid Point Set!")
+                print("Invalid Point Set! Not enough points to create normal!")
                 return false,false,false
             end
             return 2*(rx*ry-rz*rw),1-2*(rx*rx+rz*rz),2*(ry*rz+rx*rw)
@@ -369,13 +369,30 @@ function Object(position, orientation, positionType, orientationType)
                 for i=1, #subElements do
                     subElements[i].updateNormal()
                 end
-                user.setNormal(createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4]))
+                if elementData[15] then
+                    user.setNormal(createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4]))
+                end
             end
             user.updateNormal = updateNormal
             mRot.assignFunctions(user, updateNormal)
-
+            local function dataParityCheck(drawString)
+                local count = select(2, drawString:gsub("%%", ""))
+                local otherCount = (#elementData[9])*2
+                local drawData = elementData[8]
+                if drawData then
+                    otherCount = otherCount + #drawData
+                    local sizes = drawData.sizes
+                    if sizes then
+                        otherCount = otherCount + #sizes
+                    end
+                end
+                if otherCount ~= count then
+                    print('Input Parity Failed for UI Element Index ' .. elementIndex .. '. It has ' .. count .. ' in the draw string while it has ' .. otherCount .. ' values stored for access. Try set the draw string last.')
+                end
+            end
             local function drawChecks()
                 local defaultDraw = elementData[2]
+                
                 if defaultDraw then
                     if not elementData[3] then
                         elementData[3] = elementData[2]
@@ -389,9 +406,9 @@ function Object(position, orientation, positionType, orientationType)
                 actions[7] = true
             end
             
-            function user.setHoverDraw(hDraw) elementData[1] = hDraw; drawChecks() end
-            function user.setDefaultDraw(dDraw) elementData[2] = dDraw; drawChecks() end
-            function user.setClickDraw(cDraw) elementData[3] = cDraw; drawChecks() end
+            function user.setHoverDraw(hDraw) elementData[1] = hDraw; dataParityCheck(hDraw); drawChecks() end
+            function user.setDefaultDraw(dDraw) elementData[2] = dDraw; dataParityCheck(dDraw); drawChecks() end
+            function user.setClickDraw(cDraw) elementData[3] = cDraw; dataParityCheck(cDraw); drawChecks() end
             
             function user.setClickAction(action) actions[1] = action; actionCheck() end
             function user.setHoldAction(action) actions[2] = action; actionCheck() end
@@ -651,9 +668,8 @@ function Object(position, orientation, positionType, orientationType)
 
                 drawStrings[textCacheSize+2] = '"/>'
                 local d = concat(drawStrings)
-                userFunc.setDefaultDraw(d)
-                userFunc.setClickDraw(d)
                 userFunc.setPoints(pointsX,pointsY)
+                userFunc.setDefaultDraw(d)
             end
             
             function userFunc.setText(text)
@@ -824,6 +840,11 @@ function Object(position, orientation, positionType, orientationType)
                 progress = prog or 0
                 if progress < 0 then
                     progress = 0
+                end
+                if progress == 0 then
+                    userFuncFill.hide()
+                else
+                    userFuncFill.show()
                 end
                 if progress > 100 then
                     progress = 100
