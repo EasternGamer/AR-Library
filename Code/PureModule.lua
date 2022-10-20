@@ -1,14 +1,11 @@
-
-
-
-function LoadPureModule(self, pureTable)
+function LoadPureModule(self, customGroups)
     
     function self.setCustomSVGs(groupId)
         local multiPoint={}
         local singlePoint={}
         local group={multiPoint,singlePoint}
         local groupId = groupId or #customGroups+1
-        pureTable[groupId]=group
+        customGroups[groupId]=group
         local mC,sC=1,1
 
         local self={}
