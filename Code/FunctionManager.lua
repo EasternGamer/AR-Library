@@ -41,9 +41,8 @@ function getManager()
                         x = -rad(x * 0.5)
                         y = rad(y * 0.5)
                         z = -rad(z * 0.5)
-                        local s,c=sin,cos
-                        local sP,sH,sR=s(x),s(y),s(z)
-                        local cP,cH,cR=c(x),c(y),c(z)
+                        local sP,sH,sR=sin(x),sin(y),sin(z)
+                        local cP,cH,cR=cos(x),cos(y),cos(z)
                         return (sP*cH*cR-cP*sH*sR),(cP*sH*cR+sP*cH*sR),(cP*cH*sR-sP*sH*cR),(cP*cH*cR+sP*sH*sR)
                     else
                         return 0,0,0,1
@@ -104,9 +103,11 @@ function getManager()
         --Primary Processing Functions--
         --============================--
         local function process(wx,wy,wz,ww,lX,lY,lZ,lTX,lTY,lTZ)
-            wx,wy,wz,ww = wx or 0, wy or 0, wz or 0, ww or 1
-            lX,lY,lZ = lX or pX, lY or pY, lZ or pZ
-            lTX,lTY,lTZ = lTX or pX, lTY or pY, lTZ or pZ
+            if not wx then
+                wx,wy,wz,ww = wx or 0, wy or 0, wz or 0, ww or 1
+                lX,lY,lZ = pX, pY, pZ
+                lTX,lTY,lTZ = pX, pY, pZ
+            end
         
             local dX,dY,dZ
             if not isRelativePosition then
@@ -202,12 +203,11 @@ function getManager()
             end
             return needsUpdate
         end
-        
         local function assignFunctions(inFuncArr,specialCall)
             inFuncArr.update = process
             function inFuncArr.getPosition() return pX,pY,pZ end
             function inFuncArr.getRotationManger() return out end
-            
+            inFuncArr.checkUpdate = out.checkUpdate
             function inFuncArr.setPosition(tx,ty,tz)
                 if not (tx ~= tx or ty ~= ty or tz ~= tz)  then
                     pX,pY,pZ = tx,ty+rand()*0.00001,tz
@@ -260,7 +260,9 @@ function getManager()
             function inFuncArr.rotateDefaultX(rotX) tdx = rotX; tdw = nil; rotate(true); if specialCall then specialCall() end end
             function inFuncArr.rotateDefaultY(rotY) tdy = rotY; tdw = nil; rotate(true); if specialCall then specialCall() end end
             function inFuncArr.rotateDefaultZ(rotZ) tdz = rotZ; tdw = nil; rotate(true); if specialCall then specialCall() end end
-            function inFuncArr.setPositionIsRelative(isRelative) isRelativePosition = true; outBubble() end
+            function inFuncArr.setPositionIsRelative(isRelative) isRelativePosition = isRelative; outBubble() end
+            function inFuncArr.getDefaultRotation() return dx, dy, dz, dw end
+            function inFuncArr.getRotation() return ix, iy, iz, iw end
         end
         out.assignFunctions = assignFunctions
         

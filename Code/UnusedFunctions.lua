@@ -1043,3 +1043,184 @@ function self.createTableDraw(tx, ty, tz)
         local mZX, mZY, mZZ = 2*(x*z + y*w),2*(y*z - x*w),1 - 2*(x*x + y*y)
         return mXX, mXY, mXZ,mYX, mYY, mYZ,mZX, mZY, mZZ
     end
+	
+	
+	local modelElements = uiGroup[2]
+	for eC = 1, #modelElements do
+                        local mod = modelElements[eC]
+                        local mXO, mYO, mZO = mod[10], mod[11], mod[12]
+                        local scale = mod[5]
+                        local pointsInfo = mod[9]
+                        local pointsX, pointsY, pointsZ = pointsInfo[1], pointsInfo[2], pointsInfo[3]
+                        local tPointsX, tPointsY = {}, {}
+                        local size = #pointsX
+                        tPointsX[size] = false
+                        tPointsY[size] = false
+
+                        local xwAdd = mXX * mXO + mXY * mYO + mXZ * mZO + mXW
+                        local ywAdd = mYX * mXO + mYY * mYO + mYZ * mZO + mYW
+                        local zwAdd = mZX * mXO + mZY * mYO + mZZ * mZO + mZW
+
+                        for index = 1, size do
+                            local x, y, z = pointsX[index]*scale, pointsY[index]*scale, pointsZ[index]*scale
+                            local pz = mYX * x + mYY * y + mYZ * z + ywAdd
+                            if pz > 0 then
+                                tPointsX[index] = (mXX * x + mXY * y + mXZ * z + xwAdd) / pz
+                                tPointsY[index] = (mZX * x + mZY * y + mZZ * z + zwAdd) / pz
+                            end
+                        end
+
+                        local lX, lY, lZ = 0.26726, 0.80178, 0.53452
+                        local ambience = 0.3
+                        local planes = mod[13]
+                        local planeNumber = #planes
+                        zSorter[zBC + planeNumber] = false
+                        for p = 1, planeNumber do
+                            local plane = planes[p]
+                            local eXO, eYO, eZO = plane[1] + mXO, plane[2] + mYO, plane[3] + mZO
+                            local eCZ = mYX * eXO + mYY * eYO + mYZ * eZO + mYW
+                            if eCZ < 0 then
+                                goto behindElement
+                            end
+                            local p0X, p0Y, p0Z = P0XD - eXO, P0YD - eYO, P0ZD - eZO
+
+                            local NX, NY, NZ = plane[4], plane[5], plane[6]
+                            local dotValue = p0X * NX + p0Y * NY + p0Z * NZ
+
+                            if dotValue < 0 then
+                                goto behindElement
+                            end
+
+                            local brightness = (lX * NX + lY * NY + lZ * NZ)
+                            if brightness < 0 then
+                                brightness = (brightness * 0.1) * (1 - ambience) + ambience
+                            else
+                                brightness = (brightness) * (1 - ambience) + ambience
+                            end
+                            
+                            zBC = zBC + 1
+                            zSorter[zBC] = eCZ
+                            zBuffer[eCZ] = {
+                                function (uD,c)
+                                    local plane = plane
+                                    local m = 3 + c
+                                    local indices = plane[7]
+                                    local indexSize = #indices
+                                    uD[m + indexSize * 2 - 1] = false
+                                
+                                    for i = 1, indexSize do
+                                        local index = indices[i]
+                                        local pntX = tPointsX[index]
+                                        if not pntX then
+                                            return '',c
+                                        end
+
+                                        uD[m] = pntX
+                                        uD[m + 1] = tPointsY[index]
+                                        m = m + 2
+                                    end
+                                    uD[c] = plane[8] * brightness
+                                    uD[c+1] = plane[9] * brightness
+                                    uD[c+2] = plane[10] * brightness
+                                    return plane[11], m
+                                end,
+                                is3D = true
+                            }
+
+                            ::behindElement::
+                        end
+                    end
+					
+                elseif uiElmt.is3D then
+                    drawStringData[dU],uC = uiElmt[1](unpackData,uC)
+                    dU = dU + 1
+					local mElementIndex = 0
+        function self.create3DObject(x,y,z)
+            local userFunc = {}
+            local pointSet = {{},{},{},{}}
+            local drawStrings = {}
+            local faces = {}
+            
+            local actions = {false,false,false,false,false,false}
+            
+            local elementData = {is3D = true, false, false, false, actions, 1, true, false, false, pointSet, x, y, z,faces}
+            local eC = mElementIndex + 1
+            mElementIndex = eC
+            local mElementIndex = eC
+            modelElements[eC] = elementData
+            function userFunc.setScale(scale) 
+                elementData[5] = scale
+            end
+            function userFunc.addPoints(points,ref)
+                local pntX,pntY,pntZ,rotation = pointSet[1],pointSet[2],pointSet[3],pointSet[4]
+                local s1,s2 = #pntX, #points
+                local total = s1+s2
+                pntX[total] = false
+                pntY[total] = false
+                pntZ[total] = false
+                
+                for i=s1+1, total do
+                    local pnt = points[i]
+                    pntX[i] = pnt[1]
+                    pntY[i] = pnt[2]
+                    pntZ[i] = pnt[3]
+                end
+            end
+            
+            
+            function userFunc.setFaces(newFaces,r,g,b)
+                local concat,remove = table.concat,table.remove
+                local pntX,pntY,pntZ = pointSet[1],pointSet[2],pointSet[3]
+                
+                local function getData(pointIndices)
+                    local pntCount = #pointIndices
+                    if pntCount > 2 then
+                        local p1i,p2i,p3i = pointIndices[1],pointIndices[2],pointIndices[3]
+                        local p1x,p1y,p1z,p2x,p2y,p2z,p3x,p3y,p3z = pntX[p1i],pntY[p1i],pntZ[p1i],pntX[p2i],pntY[p2i],pntZ[p2i],pntX[p3i],pntY[p3i],pntZ[p3i]
+                        
+                        local v1x,v1y,v1z = p2x-p1x,p2y-p1y,p2z-p1z
+                        local v2x,v2y,v2z = p3x-p1x,p3y-p1y,p3z-p1z
+                        local nx,ny,nz = v1y*v2z-v1z*v2y,v1z*v2x-v1x*v2z,v1x*v2y-v2x*v1y
+                        local mag = (nx*nx+ny*ny+nz*nz)^(0.5)
+                        nx,ny,nz = nx/mag,ny/mag,nz/mag
+                        local pX,pY,pZ = p1x+p2x+p3x,p1y+p2y+p3y,p1z+p2z+p3z
+                        local oData = nil
+                        if pntCount == 4 then
+                            local tmpOData = getData({pointIndices[4],pointIndices[1],pointIndices[3]})
+                            if not (tmpOData[4] == nx and tmpOData[5] == ny and tmpOData[6] == nz) then
+                                remove(pointIndices,4)
+                                oData = tmpOData
+                            end
+         
+                        end
+                        local count = 3
+                        local string = {'<path color=rgb(%.f,%.f,%.f) d="M%.1f %.1fL%.1f %.1f %.1f %.1f'}
+                        local sCount = 2
+                        for i=4, #pointIndices do
+                            local pi = pointIndices[i]
+                            pX,pY,pZ = pX + pntX[pi],pY+ pntY[pi],pZ+ pntZ[pi] 
+                            count = count + 1
+                            string[sCount] = ' %.1f %.1f'
+                            sCount = sCount + 1
+                        end
+                        string[sCount] = 'Z"/>'
+                        
+                        return {pX/count,pY/count,pZ/count,nx,ny,nz,pointIndices,r,g,b,concat(string)},oData
+                    end
+                end
+                local m = 1
+                for i=1, #newFaces do
+                    local data,oData = getData(newFaces[i])
+                    faces[m] = data
+                    m=m+1
+                    if oData then
+                        faces[m] = oData
+                        m=m+1
+                    end
+                end
+            end
+            
+            function userFunc.setDrawData(drawData) elementData[8] = drawData end
+            
+            return userFunc
+        end
