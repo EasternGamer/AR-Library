@@ -1,323 +1,249 @@
 function Projector(camera)
     -- Localize frequently accessed data
-    --local utils = require("cpml.utils")
-
-    --local library=library
-    local construct, player, system, manager = construct, player, system, getManager()
-    local frameCounter = 0
-    local frameBuffer = {''}
-    local isSmooth = true
+    local construct, player, system, math = construct, player, system, math
+    
+    -- Internal Parameters
+    local frameBuffer,frameRender,isSmooth = {''},true,true
 
     -- Localize frequently accessed functions
     --- System-based function calls
-    local getWidth, getHeight, getFov, getMouseDeltaX, getMouseDeltaY, print =
-        system.getScreenWidth,
-        system.getScreenHeight,
-        system.getFov,
-        system.getMouseDeltaX,
-        system.getMouseDeltaY,
-        system.print
+    local getWidth, getHeight, getFov, print, getTime =
+    system.getScreenWidth,
+    system.getScreenHeight,
+    system.getFov,
+    system.print,
+    system.getArkTime
 
     --- Core-based function calls
     local getCWorldR, getCWorldF, getCWorldU, getCWorldPos =
-        construct.getWorldRight,
-        construct.getWorldForward,
-        construct.getWorldUp,
-        construct.getWorldPosition
+    construct.getWorldRight,
+    construct.getWorldForward,
+    construct.getWorldUp,
+    construct.getWorldPosition
 
     --- Camera-based function calls
     local getCameraLocalPos = system.getCameraPos
     local getCamLocalFwd, getCamLocalRight, getCamLocalUp =
-        system.getCameraForward,
-        system.getCameraRight,
-        system.getCameraUp
+    system.getCameraForward,
+    system.getCameraRight,
+    system.getCameraUp
 
     --- Manager-based function calls
     ---- Quaternion operations
-    local matrixToQuat = manager.matrixToQuat
-
-    -- Localize Math functions
-    local maths = math
-    local sin, cos, tan, rad ,atan =
-        maths.sin,
-        maths.cos,
-        maths.tan,
-        maths.rad,
-        maths.atan
+    local rotMatrixToQuat,solveMat,quatMulti = rotMatrixToQuat,library.systemResolution3,quaternionMultiply
+    local function solve(mx,my,mz,mw,ix,iy,iz,iw)
+        if ix then return quatMulti(mx,my,mz,mw,ix,iy,iz,iw) else return solveMat(mx,my,mz,mw) end
+    end
     
-    -- Projection infomation
+    -- Localize Math functions
+    local tan, atan, rad = math.tan, math.atan, math.rad
 
     --- FOV Paramters
     local vertFov = system.getCameraVerticalFov
     local horizontalFov = system.getCameraHorizontalFov
-
     local fnearDivAspect = 0
 
-    local objectGroups = {}
+    local objectGroups = LinkedList('Group', '')
 
-    local self = {objectGroups = objectGroups}
-    local oldSelected = false
+    local self = {}
+  
     function self.getSize(size, zDepth, max, min)
-        local pSize = atan(size, zDepth) * (fnearDivAspect)
-        local max = max or pSize
-        local min = min or pSize
-        if pSize >= max then
-            return max
-        elseif pSize <= min then
-            return min
-        else
-            return pSize
+        local pSize = atan(size, zDepth) * fnearDivAspect
+        if max then
+            if pSize >= max then
+                return max
+            else
+                if min then
+                    if pSize < min then
+                        return min
+                    end
+                end
+                return pSize
+            end
         end
+        return pSize
     end
-    
+
     function self.setSmooth(iss) isSmooth = iss end
 
-    function self.addObjectGroup(objectGroup, id)
-        local index = id or #objectGroups + 1
-        objectGroups[index] = objectGroup
-        return index
-    end
+    function self.addObjectGroup(objectGroup) objectGroups.Add(objectGroup) end
 
-    function self.removeObjectGroup(id)
-        objectGroups[id] = {}
-    end
-    local ax,ay,az,aw,cRX, cRY, cRZ, cFX, cFY, cFZ, cUX, cUY, cUZ
-    function self.getModelMatrix(mObject)
-        local s, c = sin, cos
-        local modelMatrices = {}
-
-        -- Localize Object values.
-        local objOri, objPos = mObject[6], mObject[7]
-        local objPosX, objPosY, objPosZ = objPos[1], objPos[2], objPos[3]
-        local wx, wy, wz, ww = objOri[1], objOri[2], objOri[3], objOri[4]
-        if mObject[5] == 1 then
-            wx, wy, wz, ww =
-                wx*aw + ww*ax + wy*az - wz*ay,
-                wy*aw + ww*ay + wz*ax - wx*az,
-                wz*aw + ww*az + wx*ay - wy*ax,
-                ww*aw - wx*ax - wy*ay - wz*az
-        end
-        if mObject[4] == 2 then -- If Local
-            return wx, wy, wz, ww, 
-            objPosX, -- Convert this to 
-            objPosY, 
-            objPosZ
-        else
-            local cWorldPos = getCWorldPos()
-            local oPX, oPY, oPZ = objPosX-cWorldPos[1], objPosY-cWorldPos[2], objPosZ-cWorldPos[3]
-            return wx, wy, wz, ww,
-                cRX*oPX + cRY*oPY + cRZ*oPZ, 
-                cFX*oPX + cFY*oPY + cFZ*oPZ, 
-                cUX*oPX + cUY*oPY + cUZ*oPZ
-        end
-    end
-    function self.getViewMatrix()
-        local cU, cF, cR = getCWorldU(), getCWorldF(), getCWorldR()
-        cRX, cRY, cRZ, cFX, cFY, cFZ, cUX, cUY, cUZ = cR[1], cR[2], cR[3], cF[1], cF[2], cF[3], cU[1], cU[2], cU[3]
-        ax,ay,az,aw = matrixToQuat(cRX, cRY, cRZ, cFX, cFY, cFZ, cUX, cUY, cUZ)
-        
-        local id = camera.cType.id
-        local fG, fL = id == 0, id == 1
-
-        if fG or fL then -- To do and fix (VERY broken now)
-            local s, c = sin, cos
-            local cOrientation = camera.orientation
-            local pitch, heading, roll = cOrientation[1] * 0.5, -cOrientation[2] * 0.5, cOrientation[3] * 0.5
-            local sP, sR, sH = s(pitch), s(heading), s(roll)
-            local cP, cR, cH = c(pitch), c(heading), c(roll)
-
-            local cx, cy, cz, cw = sP * cR, sP * sR, cP * sR, cP * cR
-            if fL then
-                wx, wy, wz, ww = cx, cy, cz, cw
-            else
-                local mx, my, mz, mw =
-                    sx * cw + sw * cx + sy * cz - sz * cy,
-                    sy * cw + sw * cy + sz * cx - sx * cz,
-                    sz * cw + sw * cz + sx * cy - sy * cx,
-                    sw * cw - sx * cx - sy * cy - sz * cz
-                wx, wy, wz, ww = mx, my, mz, mw
-            end
-        else
-            local lEye = getCameraLocalPos()
-            local lEyeX, lEyeY, lEyeZ = lEye[1], lEye[2], lEye[3]
-            local lf, lr, lu =
-                getCamLocalFwd(),
-                getCamLocalRight(),
-                getCamLocalUp()
-            
-            local lrx, lry, lrz = lr[1], lr[2], lr[3]
-            local lfx, lfy, lfz = lf[1], lf[2], lf[3]
-            local lux, luy, luz = lu[1], lu[2], lu[3]
-            
-            return lrx, lry, lrz, 
-                   lfx, lfy, lfz, 
-                   lux, luy, luz, 
-                   -(lrx * lEyeX + lry * lEyeY + lrz * lEyeZ), 
-                   -(lfx * lEyeX + lfy * lEyeY + lfz * lEyeZ), 
-                   -(lux * lEyeX + luy * lEyeY + luz * lEyeZ), 
-                   lEyeX, lEyeY, lEyeZ
-        end
-    end
+    function self.removeObjectGroup(objectGroup) objectGroups.Remove(objectGroup) end
+    
+    local previousUI = nil
     
     function self.getSVG()
-        frameCounter = frameCounter + 1
+        local getTime, atan, sort, format, concat = getTime, atan, table.sort, string.format, table.concat
+        local startTime = getTime()
+        frameCounter = not frameCounter
         local isClicked = false
         if clicked then
             clicked = false
             isClicked = true
         end
-        local isHolding = isHolding
-        
-        local fullSVG = {}
-        local fc = 1
+        local isHolding = holding
 
-        local vx1, vy1, vz1, vx2, vy2, vz2, vx3, vy3, vz3, vw1, vw2, vw3, lCX, lCY, lCZ =
-            self.getViewMatrix()
-        local vx, vy, vz, vw = matrixToQuat(vx1, vy1, vz1, vx2, vy2, vz2, vx3, vy3, vz3)
-        
-        local atan, sort, format, unpack, concat, getModelMatrix, select =
-            atan,
-            table.sort,
-            string.format,
-            table.unpack,
-            table.concat,
-            self.getModelMatrix, select
-        
-        local nFactor = 2
-        local width,height = getWidth()/nFactor, getHeight()/nFactor
+        local buffer,bufferCounter = {},0
+
+        local width,height = getWidth(), getHeight()
         local aspect = width/height
         local tanFov = tan(rad(horizontalFov() * 0.5))
-        local function zSort(t1, t2)
-            return t1[1] > t2[1]
-        end
-        --- Matrix Subprocessing
-        local nearDivAspect = width / tanFov
-        fnearDivAspect = nearDivAspect
         
+        --- Matrix Subprocessing
+        local nearDivAspect = (width*0.5) / tanFov
+        fnearDivAspect = nearDivAspect
+
         -- Localize projection matrix values
         local px1 = 1 / tanFov
         local pz3 = px1 * aspect
 
-        local pxw = px1 * width
-        local pzw = -pz3 * height
+        local pxw,pzw = px1 * width * 0.5, -pz3 * height * 0.5
+        
+        --- View Matrix Processing
+        local vCX, vCY, vCZ, lEye =
+        getCamLocalRight(),
+        getCamLocalFwd(),
+        getCamLocalUp(),
+        getCameraLocalPos()
+        local lx,ly,lz = lEye[1],lEye[2],lEye[3]
+        local vx, vy, vz, vw = rotMatrixToQuat(vCX,vCY,vCZ)
+        local vW = solve(vCX,vCY,vCZ,lEye)
+        
+        -- View Matrix
+        local vXX,vXY,vXZ = vCX[1]*pxw,vCX[2]*pxw,vCX[3]*pxw
+        local vYX,vYY,vYZ = vCY[1], vCY[2], vCY[3]
+        local vZX,vZY,vZZ = vCZ[1]*pzw, vCZ[2]*pzw, vCZ[3]*pzw
+        local vXW,vYW,vZW = -vW[1]*pxw, -vW[2], -vW[3]*pzw
+
+        
         -- Localize screen info
-        local objectGroups = objectGroups
-        local svgBuffer = {}
-        local alpha = 1
-        
-        
+        local objectGroupsArray,objectGroupSize = objectGroups.GetData()
+        local svgBuffer,svgZBuffer,svgBufferCounter = {},{},0
+
+
         local processedNumber = 0
         local processPure = ProcessPureModule
         local processUI = ProcessUIModule
+        local processRots = ProcessOrientations
         local renderUI = RenderUIElement
+        local processEvents = ProcessActionEvents
         if processPure == nil then
-            processPure = function(zBC, dU, uC) return zBC, dU, uC end
+            processPure = function(zBC) return zBC end
         end
         if processUI == nil then
-            processUI = function(zBC, dU, uC) return zBC, dU, uC end
+            processUI = function(zBC) return zBC end
+            processRots = function() end
+            processEvents = function() end
         end
-        for i = 1, #objectGroups do
-            local objectGroup = objectGroups[i]
+        local predefinedRotations = {}
+        local deltaPreProcessing = getTime() - startTime
+        local deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing = 0,0,0,0,0
+        for i = 1, objectGroupSize do
+            local drawProcessingStartTime = getTime()
+            local objectGroup = objectGroupsArray[i]
             if objectGroup.enabled == false then
                 goto not_enabled
             end
-
-            local objGTransX = objectGroup.transX or width
-            local objGTransY = objectGroup.transY or height
             local objects = objectGroup.objects
 
             local avgZ, avgZC = 0, 0
-            local zBuffer,zSorter, aBuffer,aSorter, aBC, zBC = {},{},{},{}, 0, 0
-            local unpackData, drawStringData, uC, dU = {},{}, 1, 1
-            local isZSorting = objectGroup.isZSorting
-            
+            local zBuffer, zSorter, aBuffer, aSorter, aBC, zBC = {},{},{},{}, 0, 0
+
             local notIntersected = true
             for m = 1, #objects do
                 local obj = objects[m]
                 if not obj[1] then
                     goto is_nil
                 end
-                
+
                 obj.checkUpdate()
-                
-                local mx, my, mz, mw, mw1, mw2, mw3 = getModelMatrix(obj)
+                local objOri,objPos = obj[7],obj[8]
+                local mx, my, mz, mw = objOri[1], objOri[2], objOri[3], objOri[4]
+                local mW = solve(vCX, vCY, vCZ, objPos)
+                local vMX, vMY, vMZ, vMW = solve(mx,my,mz,mw, vx,vy,vz,vw)
 
-                local vMX, vMY, vMZ, vMW =
-                    mx*vw + mw*vx + my*vz - mz*vy,
-                    my*vw + mw*vy + mz*vx - mx*vz,
-                    mz*vw + mw*vz + mx*vy - my*vx,
-                    mw*vw - mx*vx - my*vy - mz*vz
-
-                local vMXvMX, vMYvMY, vMZvMZ = vMX*vMX, vMY*vMY, vMZ*vMZ
+                local processRotations = processRots(predefinedRotations,vx,vy,vz,vw,pxw,pzw)
+                local vMXvMX, vMXvMY, vMXvMZ, vMXvMW, vMYvMY, vMYvMZ, vMYvMW, vMZvMZ, vMZvMW = 2*vMX*vMX, 2*vMX*vMY, 2*vMX*vMZ, 2*vMX*vMW, 2*vMY*vMY, 2*vMY*vMZ, 2*vMY*vMW, 2*vMZ*vMZ, 2*vMZ*vMW
 
                 local mXX, mXY, mXZ, mXW =
-                    2*(0.5 - vMYvMY - vMZvMZ)*pxw,
-                    2*(vMX*vMY + vMZ*vMW)*pxw,
-                    2*(vMX*vMZ - vMY*vMW)*pxw,
-                    (vw1 + vx1*mw1 + vy1*mw2 + vz1*mw3)*pxw
+                (1 - vMYvMY - vMZvMZ)*pxw,
+                (vMXvMY + vMZvMW)*pxw,
+                (vMXvMZ - vMYvMW)*pxw,
+                mW[1]*pxw + vXW
+
                 local mYX, mYY, mYZ, mYW =
-                    2*(vMX*vMY - vMZ*vMW),
-                    2*(0.5 - vMXvMX - vMZvMZ),
-                    2*(vMY*vMZ + vMX*vMW),
-                    (vw2 + vx2*mw1 + vy2*mw2 + vz2*mw3)
+                (vMXvMY - vMZvMW),
+                (1 - vMXvMX - vMZvMZ),
+                (vMYvMZ + vMXvMW),
+                mW[2] + vYW
 
                 local mZX, mZY, mZZ, mZW =
-                    2*(vMX*vMZ + vMY*vMW)*pzw,
-                    2*(vMY*vMZ - vMX*vMW)*pzw,
-                    2*(0.5 - vMXvMX - vMYvMY)*pzw,
-                    (vw3 + vx3*mw1 + vy3*mw2 + vz3*mw3)*pzw
-                
-                avgZ = avgZ + mYW
-                avgZC = avgZC + 1
-                local P0XD, P0YD, P0ZD = lCX - mw1, lCY - mw2, lCZ - mw3
+                (vMXvMZ + vMYvMW)*pzw,
+                (vMYvMZ - vMXvMW)*pzw,
+                (1 - vMXvMX - vMYvMY)*pzw,
+                mW[3]*pzw + vZW
 
-                zBC, dU, uC = processPure(zBC, dU, uC, obj[2], zBuffer, zSorter, isZSorting, drawStringData,
-                mXX, mXY, mXZ, mXW,
-                mYX, mYY, mYZ, mYW,
-                mZX, mZY, mZZ, mZW)
+
+                predefinedRotations[mx .. ',' .. my .. ',' .. mz .. ',' .. mw] = {mXX,mXZ,mYX,mYZ,mZX,mZZ}
+
+                avgZ = avgZ + mYW
+                local uiGroups = obj[4]
                 
-                zBC, aBC = processUI(zBC, aBC, obj[3], zBuffer, zSorter, aBuffer, aSorter,
-                mXX, mXY, mXZ, mXW,
-                mYX, mYY, mYZ, mYW,
-                mZX, mZY, mZZ, mZW,
-                P0XD, P0YD, P0YZ,
-                vMX, vMY, vMZ, vMW,
-                pxw, pzw)
-                
+                -- Process Actionables
+                obj.previousUI = processEvents(uiGroups, obj.previousUI, isClicked, isHolding, mYX, mYY, mYZ, mYW, vYX,vYY,vYZ, processRotations, lx,ly,lz, sort)
+                -- Progress Pure
+                zBC = processPure(zBC, obj[2], obj[3], zBuffer, zSorter,
+                    mXX, mXY, mXZ, mXW,
+                    mYX, mYY, mYZ, mYW,
+                    mZX, mZY, mZZ, mZW)
+                -- Process UI
+                zBC = processUI(zBC, uiGroups, zBuffer, zSorter,
+                    vXX,vXY,vXZ,
+                    vYX,vYY,vYZ,
+                    vZX,vZY,vZZ,
+                    vXW,vYW,vZW,
+                    processRotations,nearDivAspect)
+
                 ::is_nil::
             end
+            local eventStartTime = getTime()
+            deltaDrawProcessing = deltaDrawProcessing + eventStartTime - drawProcessingStartTime
             if aBC > 0 then
                 sort(aSorter)
                 oldSelected, hovered = ProcessUIEvents(aBuffer, zBuffer, aBC, oldSelected, isClicked, isHolding)
             end
-            sort(zSorter)
-            for zC = zBC, 1,-1 do
-                local distance = zSorter[zC]
-                local uiElmt = zBuffer[distance]
-                if uiElmt.isUI then
-                    drawStringData[dU],uC = renderUI(uiElmt, distance, unpackData, uC, nearDivAspect)
-                    dU = dU + 1
-                elseif uiElmt.isCustomSingle then
-                    drawStringData[dU],uC = uiElmt[3](uiElmt[1],uiElmt[2],distance,uiElmt[4],unpackData,uC)
-                    dU = dU + 1
-                else
-                    drawStringData[dU],uC = uiElmt[4](uiElmt[1],uiElmt[2],uiElmt[3],uiElmt[5],unpackData,uC)
-                    dU = dU + 1
-                end
+            local zSortingStartTime = getTime()
+            deltaEvent = deltaEvent + zSortingStartTime - eventStartTime
+            if objectGroup.isZSorting then
+                sort(zSorter)
             end
-            if avgZC > 0 then
+            
+            local zBufferCopyStartTime = getTime()
+            deltaZSort = deltaZSort + zBufferCopyStartTime - zSortingStartTime
+            local drawStringData = {}
+            for zC = 1, zBC do
+                drawStringData[zC] = zBuffer[zSorter[zC]]
+            end
+            local postProcessingStartTime = getTime()
+            deltaZBufferCopy = deltaZBufferCopy + postProcessingStartTime - zBufferCopyStartTime
+            if zBC > 0 then
                 local dpth = avgZ / avgZC
-                local actualSVGCode = concat(drawStringData):format(unpack(unpackData))
+                local actualSVGCode = concat(drawStringData)
                 local beginning, ending = '', ''
                 if isSmooth then
-                    if frameCounter % 2 == 1 then
-                        beginning = '<style>.first{animation: f1 0.008s infinite linear;} .second{animation: f2 0.008s infinite linear;} @keyframes f1 {from {visibility: hidden;} to {visibility: hidden;}} @keyframes f2 {from {visibility: visible;} to { visibility: visible;}}</style><div class="first">'
-                        ending = '</div>'
-                    else
+                    ending = '</div>'
+                    if frameCounter then
                         beginning = '<div class="second" style="visibility: hidden">'
-                        ending = '</div>'
+                    else
+                        beginning = '<style>.first{animation: f1 0.008s infinite linear;} .second{animation: f2 0.008s infinite linear;} @keyframes f1 {from {visibility: hidden;} to {visibility: hidden;}} @keyframes f2 {from {visibility: visible;} to { visibility: visible;}}</style><div class="first">'
                     end
                 end
+                local styleHeader = ('<style>svg{background:none;width:%gpx;height:%gpx;position:absolute;top:0px;left:0px;}'):format(width,height)
+                local svgHeader = ('<svg viewbox="-%g -%g %g %g"'):format(width*0.5,height*0.5,width,height)
+                
+                svgBufferCounter = svgBufferCounter + 1
+                svgZBuffer[svgBufferCounter] = dpth
+                
                 if objectGroup.glow then
                     local size
                     if objectGroup.scale then
@@ -325,96 +251,50 @@ function Projector(camera)
                     else
                         size = objectGroup.gRad
                     end
-                    svgBuffer[alpha] = {
-                        dpth,
-                        concat(
-                            {
+                    svgBuffer[dpth] = concat({
                                 beginning,
-                                '<div class="', 
-                                objectGroup.class, 
-                                '"><style>svg{background:none;width:',
-                                width * nFactor,
-                                'px;height:',
-                                height * nFactor,
-                                'px;position:absolute;top:0px;left:0px;}',
+                                '<div class="', objectGroup.class ,'">',
+                                styleHeader,
                                 objectGroup.style,
-                                '.blur { filter: blur(',
-                                size,
-                                'px) brightness(60%) saturate(3);',
-                                objectGroup.gStyle,
-                                '}</style><svg viewbox="-',
-                                objGTransX,
-                                ' -',
-                                objGTransY,
-                                ' ',
-                                width * 2,
-                                ' ',
-                                height * 2,
-                                '" class="blur">',
-                                actualSVGCode,
-                                '</svg><svg viewbox="-',
-                                objGTransX,
-                                ' -',
-                                objGTransY,
-                                ' ',
-                                width * 2,
-                                ' ',
-                                height * 2,
-                                '">',
+                                '.blur { filter: blur(',size,'px) brightness(60%) saturate(3);',
+                                objectGroup.gStyle, '}</style>',
+                                svgHeader,
+                                ' class="blur">',
+                                actualSVGCode,'</svg>',
+                                svgHeader, '>',
                                 actualSVGCode,
                                 '</svg></div>',
                                 ending
-                            }
-                        )}
-                    alpha = alpha + 1
+                            })
+                    
                 else
-                    svgBuffer[alpha] = {
-                        dpth, 
-                        concat(
-                            {
+                    svgBuffer[dpth] = concat({
                                 beginning,
-                                '<div class="', 
-                                objectGroup.class, 
-                                '"><style>svg{background:none;width:',
-                                width * nFactor,
-                                'px;height:',
-                                height * nFactor,
-                                'px;position:absolute;top:0px;left:0px;}',
-                                objectGroup.style,
-                                '}</style><svg viewbox="-',
-                                objGTransX,
-                                ' -',
-                                objGTransY,
-                                ' ',
-                                width * 2,
-                                ' ',
-                                height * 2,
-                                '">',
+                                '<div class="', objectGroup.class ,'">',
+                                styleHeader,
+                                objectGroup.style, '}</style>',
+                                svgHeader, '>',
                                 actualSVGCode,
                                 '</svg></div>',
                                 ending
-                            }
-                        )
-                    }
-                    alpha = alpha + 1
+                            })
                 end
             end
+            deltaPostProcessing = deltaPostProcessing + getTime() - postProcessingStartTime
             ::not_enabled::
         end
-        sort(svgBuffer, zSort)
-        local svgBufferSize = #svgBuffer
-        if svgBufferSize > 0 then
-            fc = fc - 1
-            for dm = 1, svgBufferSize do
-                fullSVG[fc + dm] = svgBuffer[dm][2]
-            end
+        
+        sort(svgZBuffer)
+        
+        for i = 1, svgBufferCounter do
+            buffer[i] = svgBuffer[svgZBuffer[i]]
         end
-        if frameCounter % 2 == 0 then
-            frameBuffer[2] = concat(fullSVG)
-            return concat(frameBuffer), processedNumber
+        if frameCounter then
+            frameBuffer[2] = concat(buffer)
+            return concat(frameBuffer), deltaPreProcessing, deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing
         else
             if isSmooth then
-                frameBuffer[1] = concat(fullSVG)
+                frameBuffer[1] = concat(buffer)
             else
                 frameBuffer[1] = ''
             end

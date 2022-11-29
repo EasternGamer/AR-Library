@@ -1,4 +1,3 @@
-
 local atan = math.atan
 local unpack = table.unpack
 
@@ -14,7 +13,7 @@ local TEXT_ARRAY = {
     [37] = {{0, 0, 8, 12, 2, 10, 2, 8, 6, 4, 6, 2}, 10,'M%g %gL%g %g M%g %gL%g %g M%g %gL%g %g',37}, -- %
     [38] = {{8, 0, 4, 12, 8, 8, 0, 4, 4, 0, 8, 4}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',38}, --&
     [39] = {{0, 8, 0, 12}, 2,'M%g %gL%g %g',39}, --'
-    
+
     [40] = {{6, 0, 2, 4, 2, 8, 6, 12}, 8,'M%g %gL%g %gL%g %gL%g %g',40}, --(
     [41] = {{2, 0, 6, 4, 6, 8, 2, 12}, 8,'M%g %gL%g %gL%g %gL%g %g',41}, --)
     [42] = {{0, 0, 4, 12, 8, 0, 0, 8, 8, 8, 0, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',42}, --*
@@ -25,7 +24,7 @@ local TEXT_ARRAY = {
     [47] = {{2, 0, 10, 12}, 12,'M%g %gL%g %g',47}, -- /
     [48] = {{1, 0, 9, 0, 9, 12, 1, 12, 1, 0, 9, 12}, 10,'M%g %gL%g %gL%g %gL%g %gZ M%g %gL%g %g',48}, -- 0
     [49] = {{5, 0, 5, 12, 3, 10}, 10,'M%g %gL%g %gL%g %g',49}, -- 1
-    
+
     [50] = {{1, 12, 9, 12, 9, 7, 1, 5, 1, 0, 9, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',50}, -- 2
     [51] = {{1, 12, 9, 12, 9, 0, 1, 0, 1, 6, 9, 6}, 10,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',51}, -- 3
     [52] = {{1, 12, 1, 6,  9, 6, 9,12, 9, 0}, 10,'M%g %gL%g %gL%g %g M%g %gL%g %g',52}, -- 4
@@ -36,7 +35,7 @@ local TEXT_ARRAY = {
     [57] = {{9, 0, 9, 12, 1, 12, 1, 7, 9, 5}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %g',57}, -- 9
     [58] = {{4, 9, 4, 7, 4, 5, 4, 3}, 2,'M%g %gL%g %g M%g %gL%g %g',58}, -- :
     [59] = {{4, 9, 4, 7, 4, 5, 1, 2}, 5,'M%g %gL%g %g M%g %gL%g %g',59}, -- ;
-    
+
     [60] = {{6, 0, 2, 6, 6, 12}, 6,'M%g %gL%g %gL%g %g',60}, -- <
     [61] = {{1, 4, 7, 4, 1, 8, 7, 8}, 8,'M%g %gL%g %g M%g %gL%g %g',61}, -- =
     [62] = {{2, 0, 6, 6, 2, 12}, 6,'M%g %gL%g %gL%g %g',62}, -- >
@@ -47,7 +46,7 @@ local TEXT_ARRAY = {
     [67] = {{8, 0, 0, 0, 0, 12, 8, 12}, 10,'M%g %gL%g %gL%g %gL%g %g',67}, -- C
     [68] = {{0, 0, 0, 12, 4, 12, 8, 8, 8, 4, 4, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %gZ',68}, -- D 
     [69] = {{8, 0, 0, 0, 0, 12, 8, 12, 0, 6, 6, 6}, 10, 'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',69}, -- E
-    
+
     [70] = {{0, 0, 0, 12, 8, 12, 0, 6, 6, 6}, 10,'M%g %gL%g %gL%g %g M%g %gL%g %g',70}, -- F
     [71] = {{6, 6, 8, 4, 8, 0, 0, 0, 0, 12, 8, 12}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %gL%g %g',71}, -- G
     [72] = {{0, 0, 0, 12, 0, 6, 8, 6, 8, 12, 8, 0}, 10,'M%g %gL%g %g M%g %gL%g %g M%g %gL%g %g',72}, -- H
@@ -58,7 +57,7 @@ local TEXT_ARRAY = {
     [77] = {{0, 0, 0, 12, 4, 8, 8, 12, 8, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %g',77}, -- M
     [78] = {{0, 0, 0, 12, 8, 0, 8, 12}, 10,'M%g %gL%g %gL%g %gL%g %g',78}, -- N
     [79] = {{0, 0, 0, 12, 8, 12, 8, 0}, 10,'M%g %gL%g %gL%g %gL%g %gZ',79}, -- O
-    
+
     [80] = {{0, 0, 0, 12, 8, 12, 8, 6, 0, 5}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %g',80}, -- P
     [81] = {{0, 0, 0, 12, 8, 12, 8, 4, 4, 4, 8, 0}, 10,'M%g %gL%g %gL%g %gL%g %gZ M%g %gL%g %g',81}, -- Q
     [82] = {{0, 0, 0, 12, 8, 12, 8, 6, 0, 5, 4, 5, 8, 0}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',82}, -- R
@@ -69,7 +68,7 @@ local TEXT_ARRAY = {
     [87] = {{0, 12, 2, 0, 4, 4, 6, 0, 8, 12}, 10,'M%g %gL%g %gL%g %gL%g %gL%g %g',87}, -- W
     [88] = {{0, 0, 8, 12, 0, 12, 8, 0}, 10,'M%g %gL%g %g M%g %gL%g %g',88}, -- X
     [89] = {{0, 12, 4, 6, 8, 12, 4, 6, 4, 0}, 10,'M%g %gL%g %gL%g %g M%g %gL%g %g',89}, -- Y
-    
+
     [90] = {{0, 12, 8, 12, 0, 0, 8, 0, 2, 6, 6, 6}, 10,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',90}, -- Z
     [91] = {{6, 0, 2, 0, 2, 12, 6, 12}, 6,'M%g %gL%g %gL%g %gL%g %g',91}, -- [
     [92] = {{1, 12, 9, 0}, 10,'M%g %gL%g %g',92}, -- \
@@ -77,7 +76,7 @@ local TEXT_ARRAY = {
     [94] = {{2, 6, 4, 12, 6, 6}, 6,'M%g %gL%g %gL%g %g',94}, -- ^
     [95] = {{0, 0, 8, 0}, 10,'M%g %gL%g %g',95}, -- _
     [96] = {{2, 12, 6, 8}, 6,'M%g %gL%g %g',96}, -- `
-    
+
     [123] = {{6, 0, 4, 2, 4, 10, 6, 12, 2, 6, 4, 6}, 6,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',123}, -- {
     [124] = {{4, 0, 4, 5, 4, 6, 4, 12}, 6,'M%g %gL%g %g M%g %gL%g %g',124}, -- |
     [125] = {{4, 0, 6, 2, 6, 10, 4, 12, 6, 6, 8, 6}, 6,'M%g %gL%g %gL%g %gL%g %g M%g %gL%g %g',125}, -- }
@@ -110,10 +109,10 @@ function PathBuilder()
     local c = 1
     local path = {}
     local pc = 1
-    
+
     local table = table
     local concat,insert,pairs = table.concat, table.insert, pairs
-    
+
     local attributes = {
         Id = {nil,nil,'id','%s'},
         Class = {nil,nil,'class','%s'},
@@ -129,7 +128,7 @@ function PathBuilder()
         StrokeDashArray = {nil,nil,'stroke-dasharray','%s'},
         StrokeDashOffset = {nil,nil,'stroke-dashoffset','%s'}
     }
-    
+
     local builder = {}
     local lastCommand = 0
     function builder.moveTo(x,y)
@@ -185,11 +184,11 @@ function PathBuilder()
         pc=pc+1
         return builder
     end
-    
+
     for k,v in pairs(attributes) do
         builder['set' .. k] = function(attribute, inTable) local attribution = attributes[k]; attribution[1],attribution[2] = attribute, inTable; return builder end
     end
-    
+
     function builder.getPoints()
         return points
     end
@@ -231,19 +230,13 @@ function PathBuilder()
 end
 
 
-function LoadUIModule(self, uiGroups, manager, RotationHandler)
+function LoadUIModule(self, uiGroups, objectRotation)
     local rand = math.random
+    
     function self.setUIElements(groupId)
         groupId = groupId or 1
         local remove,unpack = table.remove,table.unpack
 
-        local function createNormal(points, rx, ry, rz, rw)
-            if #points < 3 then
-                print("Invalid Point Set! Not enough points to create normal!")
-                return false,false,false
-            end
-            return 2*(rx*ry-rz*rw),1-2*(rx*rx+rz*rz),2*(ry*rz+rx*rw)
-        end
         local function createBounds(pointsX,pointsY,scale)
             local size = #pointsX
             if size >= 60 then return false end
@@ -258,120 +251,75 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                 return {bPointsX,bPointsY}
             end
         end
-        
-        local head = nil
-        local tail = nil
+        local DrawList = LinkedList('Draw', 'draw')
+        local ActionList = LinkedList('Action', 'action')
+        uiGroups[groupId] = {DrawList,ActionList}
 
         local self = {}
 
         local function createUITemplate(x,y,z)
-            
+
             if not (x and y and z) then
                 print('Invalid coordinate set for UI element, defaulting to 0, 0, 0.')
                 x,y,z = 0, 0, 0
             end
-            
+
             local removed = false
             local huge = math.huge
             local maxX,minX,maxY,minY = -huge,huge,-huge,huge
             local boundScale = 1
-            
+
             local pointSetX,pointSetY = {},{}
             local actions = {false,false,false,false,false,false,false}
             local mainRotation = {0,0,0,1}
-            local resultantPos = {x,y+rand()*0.00001,z}
-            local mRot = RotationHandler(mainRotation,resultantPos)
-            
+            local resultantPos = {x,y,z}
+            local mRot = getRotationManager(mainRotation,resultantPos)
+            objectRotation.addSubRotation(mRot)
+            local subElementList = LinkedList('SubElement' , 'sub')
+           
             local elementData = {
-                false, 
-                false, 
-                false, 
-                actions, 
-                1, 
-                true, 
-                false, 
-                false, 
-                pointSetX, 
-                pointSetY, 
-                resultantPos, 
                 false,
                 false,
                 false,
-                false, 
+                actions,
+                1,
+                false,
+                pointSetX,
+                pointSetY,
+                resultantPos,
+                false,
                 mainRotation,
-                mRot,
-                true,
-                subRotIndex = nil,
-                nextNode = nil, 
-                prevNode = nil,
-                parentNode = nil,
-                nextSubNode = nil, 
-                prevSubNode = nil,
-                head = nil, 
-                tail = nil
+                false
             }
-            
-            
-            if tail then
-                tail.nextNode = elementData
-                elementData.prevNode = tail
-                tail = elementData
-            else
-                head = elementData
-                tail = elementData
-                uiGroups[groupId] = head
-            end
-            
             function elementData.addSubElement(element)
-                if element then
-                    element.parentNode = elementData
-                    
-                    local nodeTail = elementData.tail
-                    if nodeTail then
-                        nodeTail.nextSubNode = element
-                        element.prevSubNode = nodeTail
-                        elementData.tail = element
-                    else
-                        elementData.head = element
-                        elementData.tail = element
-                    end
-                    element.subRotIndex = mRot.addSubRotation(element.getRotationManager())
-                else
-                    print("Sub element attempted to added is nil!")
-                end
+                subElementList.subAdd(element)
+                element.parentElement = elementData
             end
             function elementData.removeSubElement(element, deepDelete)
-                if element.parentElement == user then
-                    mRot.removeSubRotation(element.subRotIndex)
-                    element.parentNode = nil
-                    element.subRotIndex = nil
-                    local nextSubNode = element.nextSubNode
-                    local prevSubNode = element.prevSubNode
-                    if nextSubNode then
-                       if prevSubNode then
-                            nextSubNode.prevSubNode = prevSubNode
-                            prevSubNode.nextSubNode = nextSubNode
-                       else
-                            nextSubNode.prevSubNode = nil
-                            elementData.head = nextSubNode
-                       end
-                    else
-                        if prevSubNode then
-                            prevSubNode.nextSubNode = nil
-                            elementData.tail = prevSubNode 
-                        else
-                            elementData.head = nil
-                            elementData.tail = nil
-                        end
+                mRot.removeSubRotation(element)
+                element.parentElement = nil
+                if deepDelete then
+                    element.remove(deepDelete)
+                end
+            end
+            function elementData.remove(deepDelete)
+                if not removed then
+                    local curSubList,size = subElementList.subGetData()
+                    for i=1, size do
+                        elementData.removeSubElement(curSubList[i], deepDelete)
                     end
-                    local curSubNode = element.head
-                    while curSubNode do
-                        element.removeSubElement(curSubNode, deepDelete)
-                        curSubNode = curSubNode.nextSubNode
+
+                    DrawList.drawRemove(elementData)
+                    ActionList.actionRemove(elementData)
+
+
+                    local parentNode = elementData.parentNode
+                    if parentNode then
+                        parentNode.removeSubElement(elementData, deepDelete)
                     end
-                    if deepDelete then
-                        element.remove(deepDelete)
-                    end
+                    removed = true
+                else
+                    print('Error: Trying to remove an already removed element.')
                 end
             end
             local function handleBound(x,y)
@@ -395,15 +343,8 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                     end
                 end
             end
-            function elementData.addPoints(points,override)
-                local pntsX,pntsY = nil,nil
-                if override then
-                    pntsX,pntsY = {},{}
-                    elementData[9],elementData[10] = pntsX,pntsY
-                    pointSetX,pointSetY = pntsX,pntsY
-                else
-                    pntsX,pntsY = pointSetX,pointSetY
-                end
+            function elementData.addPoints(points)
+                local pntsX,pntsY = pointSetX,pointSetY
                 if points then
                     local pointCount = #points
                     if pointCount > 0 then
@@ -413,23 +354,23 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                             local inc = 1
                             for i = 1, pointCount,2 do
                                 local index = startIndex + inc
-                                
+
                                 local x,y = points[i],points[i+1]
                                 handleBound(x,y)
-                                
+
                                 pntsX[index],pntsY[index] = x,y
                                 inc = inc + 1
                             end
                         elseif pType == 'table' then
-                            
+
                             local startIndex = #pntsX
                             for i = 1, pointCount do
                                 local index = startIndex + i
-                                
+
                                 local point = points[i]
                                 local x,y = point[1],point[2]
                                 handleBound(x,y)
-                                
+
                                 pntsX[index],pntsY[index] = x,y
                             end
                         else
@@ -438,27 +379,16 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                     end
                 end
             end
-                
+
             function elementData.getRotationManager()
                 return mRot
             end
-            
-            local function updateNormal()
-                local curSubNode = elementData.head
-                while curSubNode do
-                    curSubNode.updateNormal()
-                    curSubNode = curSubNode.nextSubNode
-                end
-                if elementData[15] then
-                    elementData.setNormal(createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4]))
-                end
-            end
-            elementData.updateNormal = updateNormal
-            mRot.assignFunctions(elementData, updateNormal)
+
+            mRot.assignFunctions(elementData)
             local function dataParityCheck(drawString)
                 local count = select(2, drawString:gsub("%%", ""))
-                local otherCount = (#elementData[9])*2
-                local drawData = elementData[8]
+                local pointCount = (#elementData[7])*2
+                local drawData = elementData[6]
                 local drawDataCount = 0
                 if drawData then
                     drawDataCount = drawDataCount + #drawData
@@ -467,14 +397,14 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                         drawDataCount = drawDataCount + #sizes
                     end
                 end
-                otherCount = otherCount + drawDataCount
-                if otherCount ~= count then
-                    print('Input Parity Failed for ' .. elementData.toString() .. '. It has ' .. count .. ' in the draw string while it has ' .. otherCount .. ' values stored for access, with ' .. drawDataCount .. ' being draw data. Try set the draw string last.')
+                drawDataCount = pointCount + drawDataCount
+                if drawDataCount ~= count then
+                    print('Input Parity Failed for ' .. elementData.toString() .. '. It has ' .. count .. ' in the draw string while it has ' .. drawDataCount .. ' values stored for access, with ' .. pointCount .. ' being point data. Try set the draw string last.')
                 end
             end
             local function drawChecks()
                 local defaultDraw = elementData[2]
-                
+
                 if defaultDraw then
                     if not elementData[3] then
                         elementData[3] = elementData[2]
@@ -483,72 +413,36 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                         elementData[1] = elementData[2]
                     end
                 end
+                elementData[12] = defaultDraw
+                elementData.showDraw()
             end
             local function actionCheck()
-                actions[7] = true
+                elementData.showActionable()
             end
-            
+
             function elementData.setHoverDraw(hDraw) elementData[1] = hDraw; dataParityCheck(hDraw); drawChecks() end
             function elementData.setDefaultDraw(dDraw) elementData[2] = dDraw; dataParityCheck(dDraw); drawChecks() end
             function elementData.setClickDraw(cDraw) elementData[3] = cDraw; dataParityCheck(cDraw); drawChecks() end
-            
+
             function elementData.setClickAction(action) actions[1] = action; actionCheck() end
             function elementData.setHoldAction(action) actions[2] = action; actionCheck() end
             function elementData.setEnterAction(action) actions[3] = action; actionCheck() end
             function elementData.setLeaveAction(action) actions[4] = action; actionCheck() end
             function elementData.setHoverAction(action) actions[5] = action; actionCheck() end
-            function elementData.setIdentifier(identifier) actions[6] = identifier; end
-            
+
             function elementData.setScale(scale) 
                 elementData[5] = scale
             end
-            
+
             function elementData.getMaxValues()
                 return maxX,minX,maxY,minY
             end
-            
-            function elementData.hide() elementData[6] = false end
-            function elementData.show() elementData[6] = true end
-            function elementData.isShown() return elementData[6] end
-            function elementData.hideDraw() elementData[18] = false end
-            function elementData.showDraw() elementData[18] = true end
-            
-            function elementData.remove(deepDelete)
-                if not removed then
-                    local curSubNode = elementData.head
-                    while curSubNode do
-                        elementData.removeSubElement(curSubNode, deepDelete)
-                        curSubNode = curSubNode.nextSubNode
-                    end
-        
-                    local nextNode = elementData.nextNode
-                    local prevNode = elementData.prevNode
-                    if nextNode then
-                        if prevNode then
-                            nextNode.prevNode = prevNode
-                            prevNode.nextNode = nextNode
-                       else
-                            nextNode.prevNode = nil
-                            head = nextNode
-                       end
-                    else
-                        if prevNode then
-                            prevNode.nextNode = nil
-                            tail = prevNode 
-                        else
-                            head = nil
-                            tail = nil
-                        end
-                    end
-                    local parentNode = elementData.parentNode
-                    if parentNode then
-                        parentNode.removeSubElement(elementData, deepDelete)
-                    end
-                    removed = true
-                else
-                    print('Error: Trying to remove an already removed element.')
-                end
-            end
+
+            function elementData.hideDraw() DrawList.drawRemove(elementData) end
+            function elementData.showDraw() DrawList.drawAdd(elementData) end
+            function elementData.hideActionable() ActionList.actionRemove(elementData); mRot.disableNormal() end
+            function elementData.showActionable() ActionList.actionAdd(elementData); mRot.enableNormal() end
+
             local psX,psY = 0,0
             function elementData.move(sx,sy,indices,updateHitbox)
                 if not indices then
@@ -566,7 +460,7 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                 end
                 psX = sx
                 psY = sy
-                
+
                 if updateHitbox then
                     user.setBounds(createBounds(pointSetX,pointSetY,boundScale))
                 end
@@ -595,47 +489,36 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                     elementData.setBounds(createBounds(pointSetX,pointSetY,boundScale))
                 end
             end
-            
-            function elementData.setDrawOrder(indices)
-                elementData[7] = indices
-            end
-            
-            function elementData.setDrawData(drawData) elementData[8] = drawData end
-            function elementData.getDrawData() return elementData[8] end
+
+            function elementData.setDrawData(drawData) elementData[6] = drawData end
+            function elementData.getDrawData() return elementData[6] end
             function elementData.setSizes(sizes) 
-                if not elementData[8] then
-                     elementData[8] = {['sizes'] = sizes}
+                if not elementData[6] then
+                    elementData[6] = {['sizes'] = sizes}
                 else
-                    elementData[8].sizes = sizes
+                    elementData[6].sizes = sizes
                 end
             end
-            function elementData.getDrawOrder() return elementData[7] end
-            
-            function elementData.getPoints() return elementData[9],elementData[10] end
-            
+
+            function elementData.getPoints() return elementData[7],elementData[8] end
+
             function elementData.setPoints(pointsX,pointsY) 
                 if not pointsY then 
                     user.addPoints(pointsX,true)
                 else
                     pointSetX,pointSetY = pointsX,pointsY
-                    elementData[9],elementData[10] = pointsX,pointsY
+                    elementData[7],elementData[8] = pointsX,pointsY
                 end
             end
-            
-            function elementData.setNormal(nx,ny,nz)
-                elementData[12],elementData[13],elementData[14] = nx,ny,nz
-            end
-            
+
             function elementData.setBounds(bounds)
-                local nx, ny, nz = createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4])
-                elementData.setNormal(nx,ny,nz)
-                elementData[15] = bounds
+                elementData[10] = bounds
             end
-            
+
             function elementData.setBoundsScale(bScale)
                 boundScale = bScale
             end
-            
+
             function elementData.usePathBuilder(pathBuilder)
                 local drawString,dataTable,points = pathBuilder.getResult()
                 elementData.addPoints(points)
@@ -653,25 +536,18 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                 end
                 return '[' .. typeOfElement .. '] ' .. elementData[2] 
             end
-            
+
             function elementData.build(force, hasBounds)
-                
-                local nx, ny, nz = createNormal(pointSetX, mainRotation[1],mainRotation[2],mainRotation[3],mainRotation[4])
-                if nx then
-                    if elementData[2] then
-                        elementData.setNormal(nx,ny,nz)
-                        if not force then
-                            if hasBounds or hasBounds == nil then
-                                elementData.setBounds(createBounds(pointSetX,pointSetY,boundScale))
-                            else
-                                elementData.setBounds(false)
-                            end
+                if elementData[2] then
+                    if not force then
+                        if hasBounds or hasBounds == nil then
+                            elementData.setBounds(createBounds(pointSetX,pointSetY,boundScale))
+                        else
+                            elementData.setBounds(false)
                         end
-                    else
-                        print("Element Malformed: No default draw.")
                     end
                 else
-                    print("Element Malformed: Insufficient points.")
+                    print("Element Malformed: No default draw.")
                 end
             end
             return elementData
@@ -679,11 +555,11 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
         local pcall,require = pcall,require
         function self.createText(tx, ty, tz, font)
             local concat,byte,upper,lower = table.concat,string.byte,string.upper,string.lower
-            
+
             local userFunc = createUITemplate(tx, ty, tz)
             local fontSpace = TEXT_ARRAY
             if font then
-                
+
                 local tmp = pcall(function() return require('Fonts/' .. font) end)
                 if tmp then
                     fontSpace = require('Fonts/' .. font)
@@ -697,7 +573,7 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
             local wScale = 1
             local mx,my = 0,0
             local maxX,minX,maxY,minY = userFunc.getMaxValues()
-            
+
             userFunc.setDrawData(drawData)
             local oldMax = userFunc.getMaxValues
             function userFunc.getMaxValues()
@@ -708,7 +584,7 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
             end
             local function buildTextCache(text)
                 txt = text
-                
+
                 if not fontSpace.lowercase and fontSpace.uppercase then
                     text = upper(text)
                 elseif fontSpace.lowercase and not fontSpace.uppercase then
@@ -727,7 +603,7 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                 local offsetXCounter = 1
                 local tmpX,tmpY = 0,0
                 local fontSize = drawData.sizes[1] / wScale
-                
+
                 for k = 1, #textCache do
                     local char = textCache[k]
                     if char[4] == 10 then
@@ -764,7 +640,7 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                 end
                 offsetCacheX[offsetXCounter] = tmpX
             end
-            
+
             local function handleBound(x,y)
                 if x > maxX then
                     maxX = x
@@ -779,27 +655,27 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                     minY = y
                 end
             end
-            
+
             local function buildPoints()
                 local offsetY = offsetCacheY + my
                 local woffsetX,offsetXCounter = offsetCacheX[1] + mx,1
                 local fontSize = drawData.sizes[1] / wScale
-                
+
                 local pointsX,pointsY,drawStrings = {},{},{'<path stroke-width="%gpx" stroke="%s" stroke-opacity="%g" fill="none" d="'}
                 local count = 1
-                
+
                 local textCacheSize = #textCache
                 maxX,minX,maxY,minY = oldMax()
                 for k = 1, textCacheSize do
                     local char = textCache[k]
                     drawStrings[k + 1] = char[3]
-                    
+
                     local charPoints, charSize = char[1], char[2]
                     for m = 1, #charPoints, 2 do
                         local x,y = charPoints[m] * fontSize + woffsetX, charPoints[m + 1] * fontSize + offsetY
-                        
+
                         handleBound(x,y)
-                        
+
                         pointsX[count] = x
                         pointsY[count] = y
                         count = count + 1
@@ -816,14 +692,14 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                 userFunc.setPoints(pointsX,pointsY)
                 userFunc.setDefaultDraw(concat(drawStrings))
             end
-            
+
             function userFunc.setText(text)
                 buildTextCache(text)
                 buildOffsetCache()
                 buildPoints()
             end
             userFunc.usePathBuilder = nil
-            
+
             function userFunc.setWeight(scale)
                 local sizes = drawData.sizes
                 sizes[1] = sizes[1] / wScale
@@ -867,7 +743,7 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
             function userFunc.setOpacity(opacity)
                 drawData[2] = opacity
             end
-            
+
             return userFunc
         end
 
@@ -886,7 +762,7 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                 local cheight = maxY-minY
                 local cwidth = maxX-minX
                 txtFuncs.setText(text)
-                
+
                 local tMaxX,tMinX,tMaxY,tMinY = txtFuncs.getMaxValues()
                 local theight = tMaxY-tMinY
                 local twidth = tMaxX-tMinX
@@ -912,9 +788,9 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
             end
             return userFunc
         end
-        
+
         function self.createProgressBar(ex, ey, ez)
-            
+
             local userFuncOut = createUITemplate(ex, ey, ez)
             local userFuncFill = createUITemplate(0, 0, 0)
             userFuncFill.setPositionIsRelative(true)
@@ -924,17 +800,17 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
             local ePointIndices = {}
             local intervals = {}
             local progress = 100
-            
+
             function userFuncOut.getIntervals()
                 return intervals
             end
-            
+
             function userFuncOut.getProgress(pX)
                 local points = userFuncFill.getPoints()
                 if pX then
                     local c = intervals[1]
                     local xC = c[1]
-                    
+
                     local prog = (pX - points[sPointIndices[1]])/xC
                     if prog < 0 then 
                         return 0.001 
@@ -946,12 +822,12 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                 end
                 return progress
             end
-            
+
             local function makeIntervals()
-                
+
                 local sPCount = #sPointIndices
                 local ePCount = #ePointIndices
-                
+
                 local pointsX,pointsY = userFuncFill.getPoints()
                 if #pointsX > 0 then
                     if sPCount == ePCount and sPCount > 0 then
@@ -965,23 +841,23 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                     end
                 end
             end
-            
+
             function userFuncOut.setStartIndices(indices)
                 sPointIndices = indices
                 makeIntervals()
             end
-            
+
             function userFuncOut.setEndIndices(indices)
                 ePointIndices = indices
                 makeIntervals()
             end
-            
+
             local addPointsOld = userFuncOut.addPoints
             function userFuncOut.addPoints(points)
                 addPointsOld(points)
                 makeIntervals()
             end
-            
+
             function userFuncOut.setProgress(prog)
                 progress = prog or 0
                 if progress < 0 then
@@ -1018,246 +894,261 @@ function LoadUIModule(self, uiGroups, manager, RotationHandler)
                 end
                 oldShow()
             end
-            
+
             userFuncOut.setFillPoints = userFuncFill.addPoints
             userFuncOut.getFillDrawData = userFuncFill.getDrawData
             userFuncOut.setFillDrawData = userFuncFill.setDrawData
             userFuncOut.setFillDraw = userFuncFill.setDefaultDraw
             userFuncOut.setFillOffsetPosition = userFuncFill.setPosition
-            
-            
+
+
             function userFuncOut.usePathBuilder(pathBuilder)
                 local drawString,dataTable,points = pathBuilder.getResult()
                 userFuncOut.addPoints(points)
                 userFuncOut.setDrawData(dataTable)
                 userFuncOut.setDefaultDraw(drawString)
             end
-            
+
             function userFuncOut.useFillPathBuilder(pathBuilder)
                 local drawString,dataTable,points = pathBuilder.getResult()
                 userFuncOut.setFillPoints(points)
                 userFuncOut.setFillDrawData(dataTable)
                 userFuncOut.setFillDraw(drawString)
             end
-            
-            
-            
+
+
+
             return userFuncOut
         end
         self.createCustomDraw = createUITemplate
         return self
     end
 end
-function ProcessUIModule(zBC, aBC, uiGroups, zBuffer, zSorter, aBuffer, aSorter,
-                mXX, mXY, mXZ, mXW,
-                mYX, mYY, mYZ, mYW,
-                mZX, mZY, mZZ, mZW,
-                P0XD, P0YD, P0YZ,
-                vMX, vMY, vMZ, vMW,
-                pxw, pzw)
-    local predefinedRotation = {}
+function ProcessOrientations(predefinedRotations,vMX,vMY,vMZ,vMW,pxw,pzw)
+    return function (el)
+        local oRM = el[11]
+        local fx, fy, fz, fw = oRM[1], oRM[2], oRM[3], oRM[4]
+        local key = fx .. ',' .. fy .. ',' .. fz .. ',' .. fw
+        local pMR = predefinedRotations[key]
+        if pMR then
+            goto skip
+        end
+        do
+            local vMX,vMY,vMZ,vMW,pxw,pzw = vMX,vMY,vMZ,vMW,pxw,pzw
+            local rx, ry, rz, rw =
+            fx*vMW + fw*vMX + fy*vMZ - fz*vMY,
+            fy*vMW + fw*vMY + fz*vMX - fx*vMZ,
+            fz*vMW + fw*vMZ + fx*vMY - fy*vMX,
+            fw*vMW - fx*vMX - fy*vMY - fz*vMZ
+
+            local ryry, rxrz, ryrw = ry*ry, rx*rz,ry*rw
+            pMR = {
+                2*(0.5 - ryry - rz*rz)*pxw, 2*(rxrz - ryrw)*pxw,
+                2*(rx*ry - rz*rw), 2*(ry*rz + rx*rw),
+                2*(rxrz + ryrw)*pzw, 2*(0.5 - rx*rx - ryry)*pzw
+            }
+            predefinedRotations[key] = pMR
+        end
+        ::skip::
+        return pMR
+    end
+end
+function ProcessUIModule(zBC, uiGroups, zBuffer, zSorter,
+                vXX,vXY,vXZ,
+                vYX,vYY,vYZ,
+                vZX,vZY,vZZ,
+                vXW,vYW,vZW,
+                proc,nearDivAspect)
+    local move = table.move
     for i=1, #uiGroups do
-        local el = uiGroups[i]
-        while el do
-            if not el[6] then
-                el = el.nextNode
-                goto behindElement
-            end
-            el[17].checkUpdate()
-            local doDraw = el[18]
-            local eO = el[11]
+        local elGroup = uiGroups[i]
+        local elements,size = elGroup[1].drawGetData()
+        for i=1,size do
+            local el = elements[i]
+            local eO = el[9]
             local eXO, eYO, eZO = eO[1], eO[2], eO[3]
 
-            local eCZ = mYX*eXO + mYY*eYO + mYZ*eZO + mYW
-            if eCZ < 0 then
-                el = el.nextNode
+            local ywAdd = vYX*eXO + vYY*eYO + vYZ*eZO + vYW
+            if ywAdd < 0 then
                 goto behindElement
             end
-
-            local actions = el[4]
-            local oRM = el[16]
-            local fx, fy, fz, fw = oRM[1], oRM[2], oRM[3],-oRM[4]
-            local key = fx .. ',' .. fy .. ',' .. fz .. ',' .. fw
-            local pMR = predefinedRotation[key]
-            if pMR then
-                goto skip
+            local unpackData = {}
+            local uC = 1
+            local xwAdd,zwAdd = vXX*eXO + vXY*eYO + vXZ*eZO + vXW,vZX*eXO + vZY*eYO + vZZ*eZO + vZW
+            local xxMult,xzMult,yxMult,yzMult,zxMult,zzMult = unpack(proc(el))
+            local scale,drawData,pointsX,pointsY = el[5],el[6],el[7],el[8]
+            local sizes = drawData.sizes
+            if sizes then
+                for di=1,#sizes do
+                    unpackData[uC] = atan(sizes[di], ywAdd) * nearDivAspect
+                    uC = uC + 1
+                end
             end
-            if fw ~= -1 then
-                local rx, ry, rz, rw =
-                fx*vMW + fw*vMX + fy*vMZ - fz*vMY,
-                fy*vMW + fw*vMY + fz*vMX - fx*vMZ,
-                fz*vMW + fw*vMZ + fx*vMY - fy*vMX,
-                fw*vMW - fx*vMX - fy*vMY - fz*vMZ
+            local drawDataSize = #drawData
+            move(drawData,1,drawDataSize,uC,unpackData)
+            uC = uC + drawDataSize
+            for ePC=1, #pointsX do
+                local ex, ez = pointsX[ePC]*scale, pointsY[ePC]*scale
+                
+                local pz = yxMult*ex + yzMult*ez + ywAdd
+                if pz < 0 then
+                    goto behindElement
+                end
 
-                local rxrx, ryry, rzrz = rx * rx, ry * ry, rz * rz
-                pMR = {
-                    (1 - 2*(ryry + rzrz))*pxw, 2*(rx*rz - ry*rw)*pxw,
-                    2*(rx*ry - rz*rw), 2*(ry*rz + rx*rw),
-                    2*(rx*rz + ry*rw)*pzw, (1 - 2*(rxrx + ryry))*pzw
-                }
-                predefinedRotation[key] = pMR
-            else
-                pMR = {mXX,mXZ,mYX,mYZ,mZX,mZZ}
-                predefinedRotation[key] = pMR
+                unpackData[uC] = (xxMult*ex + xzMult*ez + xwAdd) / pz
+                unpackData[uC + 1] = (zxMult*ex + zzMult*ez + zwAdd) / pz
+                uC = uC + 2
             end
-            ::skip::
-            if el[15] and actions[7] then
-                aBC = aBC + 1
-                local p0X, p0Y, p0Z = P0XD - eXO, P0YD - eYO, P0ZD - eZO
-
-                local NX, NY, NZ = el[12], el[13], el[14]
-                local t = -(p0X * NX + p0Y * NY + p0Z * NZ) / (vx2 * NX + vy2 * NY + vz2 * NZ)
-                local px, py, pz = p0X + t * vx2, p0Y + t * vy2, p0Z + t * vz2
-
-                if not pMR[7] then
-                    fw = -fw
-                    local fyfy = fy*fy
-                    pMR[7],pMR[8],pMR[9],pMR[10],pMR[11],pMR[12] = 
-                    2*(0.5-fyfy-fz*fz),2*(fx*fy + fz*fw),2*(fx*fz - fy*fw),
-                    2*(fx*fz + fy*fw),2*(fy*fz - fx*fw),2*(0.5 - fx*fx - fyfy)
-                end
-                if doDraw then
-                    zBC = zBC + 1
-                    zSorter[zBC] = eCZ
-                    zBuffer[eCZ] = {
-                        el,
-                        false,
-                        mXX*eXO + mXY*eYO + mXZ*eZO + mXW,
-                        mZX*eXO + mZY*eYO + mZZ*eZO + mZW,
-                        pMR,
-                        isUI = true
-                    }
-                end
-                local gX,gY,gZ = px + eXO, py + eYO, pz + eZO
-                local depth = gX*gX+gY*gY+gZ*gZ
-                local function retrieveFull()
-                    return pMR[7]*px + pMR[8]*py + pMR[9]*pz,
-                    pMR[10]*px + pMR[11]*py + pMR[12]*pz, 
-                    gX, gY, gZ, eXO, eYO, eZO
-                end
-                local refEl = el
-                local function retrieveInitial()
-                    return refEl, eCZ, retrieveFull
-                end
-                aSorter[aBC] = depth
-                aBuffer[depth] = retrieveInitial
-            elseif doDraw then
-                zBC = zBC + 1
-                zSorter[zBC] = eCZ
-                zBuffer[eCZ] = {
-                    el,
-                    false,
-                    mXX*eXO + mXY*eYO + mXZ*eZO + mXW,
-                    mZX*eXO + mZY*eYO + mZZ*eZO + mZW,
-                    pMR,
-                    isUI = true
-                }
-            end
-            el = el.nextNode
+            
+            zBC = zBC + 1
+            zSorter[zBC] = -ywAdd
+            zBuffer[-ywAdd] = el[12]:format(unpack(unpackData))
             ::behindElement::
         end
     end
     return zBC, aBC
 end
 
-function ProcessUIEvents(aBuffer, zBuffer, aBC, oldSelected, isClicked, isHolding)
-    local newSelected = false
-    local notIntersected = true
-    for aC = 1, aBC do
-        local el,zDepth,retrieveFull = aBuffer[aSorter[aC]]()
+function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, mYY, mYZ, mYW, vx,vy,vz, proc, P0XD,P0YD,P0ZD, sort)
+    local aBuffer,aSorter,aBC = {},{},0
+    for i=1, #uiGroups do
+        local elGroup = uiGroups[i]
+        local elements,size = elGroup[2].actionGetData()
+        for i=1,size do
+            local el = elements[i]
+            local eO = el[9] 
+            local eX, eY, eZ = eO[1], eO[2], eO[3]
 
-        local drawForm = el[2]
-        if notIntersected then
-            local eBounds = el[15]
-            local inside = false
+            local eCZ = mYX*eX + mYY*eY + mYZ*eZ + mYW
+            if eCZ < 0 then
+                goto behindElement
+            end
 
-            local pX, pZ, gx, gy, gz, eX, eY, eZ = retrieveFull()
-            if type(eBounds) == "function" then
-                inside = eBounds(pX, pZ, zDepth)
-            else
-                local eBX,eBY = eBounds[1],eBounds[2]
-                local N = #eBX + 1
-                local p1x, p1y = eBX[1], eBY[1]
-                local offset = 0
-                for eb = 2, N do
-                    local mod = eb % N
-                    if mod == 0 then
-                        offset = 1
-                    end
-                    local index = mod + offset
-                    local p2x, p2y = eBX[index], eBY[index]
-                    local minY, maxY
-                    if p1y < p2y then
-                        minY, maxY = p1y, p2y
-                    else
-                        minY, maxY = p2y, p1y
-                    end
+            local actions = el[4]
+            
+            aBC = aBC + 1
+            local p0X, p0Y, p0Z = P0XD - eX, P0YD - eY, P0ZD - eZ
 
-                    if pZ > minY and pZ <= maxY then
-                        local maxX = p1x > p2x and p1x or p2x
+            local NX, NY, NZ = el.getNormal()
+            local t = -(p0X*NX + p0Y*NY + p0Z*NZ)/(vx*NX + vy*NY + vz*NZ)
+            
+            local function Process()
+                local el = el
+                local pMR,t = proc(el),t
+                local px, py, pz = p0X + t*vx, p0Y + t*vy, p0Z + t*vz
+                local gx,gy,gz = px + eX, py + eY, pz + eZ
+                if not pMR[7] then
+                    local oRM = el[11]
+                    local fx,fy,fz,fw = oRM[1],oRM[2],oRM[3],oRM[4]
+                    local fxfz,fyfy,fyfw = fx*fz,fy*fy,fy*fw
+                    pMR[7],pMR[8],pMR[9],pMR[10],pMR[11],pMR[12] = 
+                    2*(0.5-fyfy-fz*fz),
+                    2*(fx*fy - fz*fw),
+                    2*(fxfz + fyfw),
+                    2*(fxfz - fyfw),
+                    2*(fy*fz + fx*fw),
+                    2*(0.5 - fx*fx - fyfy)
+                end
+                local eBounds = el[10]
+                local inside = false
 
-                        if pX <= maxX then
-                            if p1y ~= p2y then
-                                if p1x == p2x or pX <= (pZ - p1y) * (p2x - p1x) / (p2y - p1y) + p1x then
-                                    inside = not inside
+                local pX, pZ = pMR[7]*px + pMR[8]*py + pMR[9]*pz, pMR[10]*px + pMR[11]*py + pMR[12]*pz
+                if type(eBounds) == "function" then
+                   inside = eBounds(pX, pZ, zDepth)
+                else
+                    local eBX,eBY = eBounds[1],eBounds[2]
+                    local N = #eBX + 1
+                    local p1x, p1y = eBX[1], eBY[1]
+                    local offset = 0
+                    for eb = 2, N do
+                        local mod = eb % N
+                        if mod == 0 then
+                            offset = 1
+                        end
+                        local index = mod + offset
+                        local p2x, p2y = eBX[index], eBY[index]
+                        local minY, maxY
+                        if p1y < p2y then
+                            minY, maxY = p1y, p2y
+                        else
+                            minY, maxY = p2y, p1y
+                        end
+
+                        if pZ > minY and pZ <= maxY then
+                            local maxX = p1x > p2x and p1x or p2x
+
+                            if pX <= maxX then
+                                if p1y ~= p2y then
+                                    if p1x == p2x or pX <= (pZ - p1y) * (p2x - p1x) / (p2y - p1y) + p1x then
+                                        inside = not inside
+                                    end
                                 end
                             end
                         end
+                        p1x, p1y = p2x, p2y
                     end
-                    p1x, p1y = p2x, p2y
-                end
 
-            end
-            if not inside then
-                goto broke
-            end
-            local actions = el[4]
-            notIntersected = false
-            newSelected = {el, actions, pX, pZ}
-            local identifier = uiElmt
-            if not oldSelected then
-                local enter = actions[3]
-                if enter then
-                    enter(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
                 end
-            elseif newSelected[10] == oldSelected[10] then
-                if isClicked then
-                    local clickAction = actions[1]
-                    if clickAction then
-                        clickAction(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
-                        isClicked = false
+                if not inside then
+                    return false
+                end
+                local actions,clickDraw,hoverDraw = el[4],el[3],el[1]
+               
+                if not oldSelected then
+                    local enter = actions[3]
+                    if enter then
+                        enter(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
                     end
-                    drawForm = el[3]
-                elseif isHolding then
-                    local holdAction = actions[2]
-                    if holdAction then
-                        hovered = true
-                        holdAction(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
+                    el[12] = hoverDraw
+                elseif el == oldSelected[1] then
+                    if isClicked then
+                        local clickAction = actions[1]
+                        if clickAction then
+                            clickAction(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
+                            isClicked = false
+                        end
+                        el[12] = clickDraw
+                    elseif isHolding then
+                        local holdAction = actions[2]
+                        if holdAction then
+                            holdAction(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
+                        end
+                        el[12] = clickDraw
+                    else
+                        local hoverAction = actions[5]
+                        if hoverAction then
+                            hoverAction(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
+                        end
+                        el[12] = hoverDraw
                     end
-                    drawForm = el[3]
                 else
-                    local hoverAction = actions[5]
-                    if hoverAction then
-                        hovered = true
-                        hoverAction(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
+                    local enter = actions[3]
+                    if enter then
+                        enter(el, pX, pZ)
                     end
-                    drawForm = el[1]
-                end
-            else
-                local enter = actions[3]
-                if enter then
-                    enter(el, pX, pZ)
-                end
-                local leave = oldSelected[2][4]
-                if leave then
-                    leave(oldSelected[1], pX, pZ)
-                end
+                    el[12] = hoverDraw
+                    local leave = oldSelected[2][4]
+                    
+                    oldSelected[1][12] = oldSelected[1][2]
+                    if leave then
+                        leave(oldSelected[1], oldSelected[3], oldSelected[4])
+                    end
 
+                end
+                return {el, actions, pX, pZ}
             end
-            ::broke::
+            aSorter[aBC] = t
+            aBuffer[t] = Process
+            ::behindElement::
         end
-        if el[18] then
-            zBuffer[zDepth][2] = drawForm
+    end
+    sort(aSorter)
+    local newSelected = false
+    for aC = 1, aBC do
+        local tmp = aBuffer[aSorter[aC]]()
+        if tmp then
+            newSelected = tmp
+            break
         end
     end
     if not newSelected and oldSelected then
@@ -1266,82 +1157,5 @@ function ProcessUIEvents(aBuffer, zBuffer, aBC, oldSelected, isClicked, isHoldin
             leave(oldSelected[1], oldSelected[3], oldSelected[4])
         end
     end
-    return newSelected, hovered
-end
-
-function RenderUIElement(uiElmt, distance, unpackData, uC, nearDivAspect)
-    local el,drawForm,xwAdd,zwAdd,pMR=unpack(uiElmt)
-    local xxMult,xzMult,yxMult,yzMult,zxMult,zzMult=unpack(pMR)
-    if not drawForm then
-        drawForm = el[2]
-        if not drawForm then
-            return '',uC
-        end
-    end
-    local ywAdd = distance
-    local count = 1
-
-    local scale,drawOrder,drawData,pointsX,pointsY = el[5],el[7],el[8],el[9],el[10]
-
-    local oUC = uC
-    if drawData then
-        local sizes = drawData.sizes
-        if sizes then
-            uC = uC + #sizes
-        end
-        uC = uC + #drawData
-    end
-
-    local broken = false
-    local pointCount = #pointsX
-    if not drawOrder then
-        for ePC=1, pointCount do
-            local ex, ez = pointsX[ePC]*scale, pointsY[ePC]*scale
-
-            local pz = yxMult*ex + yzMult*ez + ywAdd
-            if pz < 0 then
-                return '',oUC
-            end
-
-            unpackData[uC] = (xxMult*ex + xzMult*ez + xwAdd) / pz
-            unpackData[uC + 1] = (zxMult*ex + zzMult*ez + zwAdd) / pz
-            uC = uC + 2
-        end
-    else
-        while ePC <=pointCount do
-            local ex, ez = pointsX[ePC]*scale, pointsY[ePC]*scale
-
-            local pz = yxMult*ex + yzMult*ez + ywAdd
-            if pz < 0 then
-                return '',oUC
-            end
-
-            local px = (xxMult*ex + xzMult*ez + xwAdd) / pz
-            local py = (zxMult*ex + zzMult*ez + zwAdd) / pz
-
-            local indexList = drawOrder[ePC] or {}
-            for i = 1, #indexList do
-                local index = indexList[i] + (uC - 1)
-                unpackData[index] = px
-                unpackData[index + 1] = py
-            end
-        end
-    end
-    mUC = uC
-    uC = oUC
-    if drawData then
-        local sizes = drawData["sizes"]
-        if sizes then
-            for i = 1, #sizes do
-                unpackData[uC] = atan(sizes[i], distance) * nearDivAspect
-                uC = uC + 1
-            end
-        end
-        for dDC = 1, #drawData do
-            unpackData[uC] = drawData[dDC]
-            uC = uC + 1
-        end
-    end
-    
-    return drawForm,mUC
+    return newSelected
 end
