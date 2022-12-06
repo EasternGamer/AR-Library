@@ -1,342 +1,42 @@
-function Projector()
-    -- Localize frequently accessed data
-    local construct, player, system, math = DUConstruct, DUPlayer, DUSystem, math
-    
-    -- Internal Parameters
-    local frameBuffer,frameCounter,isSmooth = {''},true,true
-
-    -- Localize frequently accessed functions
-    --- System-based function calls
-    local getWidth, getHeight, getFov, print, getTime =
-    system.getScreenWidth,
-    system.getScreenHeight,
-    system.getFov,
-    system.print,
-    system.getArkTime
-
-    --- Core-based function calls
-    local getCWorldR, getCWorldF, getCWorldU, getCWorldPos =
-    construct.getWorldRight,
-    construct.getWorldForward,
-    construct.getWorldUp,
-    construct.getWorldPosition
-
-    --- Camera-based function calls
-    local getCameraLocalPos = system.getCameraPos
-    local getCamLocalFwd, getCamLocalRight, getCamLocalUp =
-    system.getCameraForward,
-    system.getCameraRight,
-    system.getCameraUp
-
-    --- Manager-based function calls
-    ---- Quaternion operations
-    local rotMatrixToQuat,solveMat,quatMulti = rotMatrixToQuat,DULibrary.systemResolution3,quaternionMultiply
-    local function solve(mx,my,mz,mw,ix,iy,iz,iw)
-        if ix then return quatMulti(mx,my,mz,mw,ix,iy,iz,iw) else return solveMat(mx,my,mz,mw) end
-    end
-    
-    -- Localize Math functions
-    local tan, atan, rad = math.tan, math.atan, math.rad
-
-    --- FOV Paramters
-    local vertFov = system.getCameraVerticalFov
-    local horizontalFov = system.getCameraHorizontalFov
-    local fnearDivAspect = 0
-
-    local objectGroups = LinkedList('Group', '')
-
-    local self = {}
-  
-    function self.getSize(size, zDepth, max, min)
-        local pSize = atan(size, zDepth) * fnearDivAspect
-        if max then
-            if pSize >= max then
-                return max
-            else
-                if min then
-                    if pSize < min then
-                        return min
-                    end
-                end
-                return pSize
-            end
-        end
-        return pSize
-    end
-
-    function self.setSmooth(iss) isSmooth = iss end
-
-    function self.addObjectGroup(objectGroup) objectGroups.Add(objectGroup) end
-
-    function self.removeObjectGroup(objectGroup) objectGroups.Remove(objectGroup) end
-    
-    local previousUI = nil
-    
-    function self.getSVG()
-        local getTime, atan, sort, format, concat = getTime, atan, table.sort, string.format, table.concat
-        local startTime = getTime()
-        frameRender = not frameRender
-        local isClicked = false
-        if clicked then
-            clicked = false
-            isClicked = true
-        end
-        local isHolding = holding
-
-        local buffer,bufferCounter = {},0
-
-        local width,height = getWidth(), getHeight()
-        local aspect = width/height
-        local tanFov = tan(rad(horizontalFov() * 0.5))
-        
-        --- Matrix Subprocessing
-        local nearDivAspect = (width*0.5) / tanFov
-        fnearDivAspect = nearDivAspect
-
-        -- Localize projection matrix values
-        local px1 = 1 / tanFov
-        local pz3 = px1 * aspect
-
-        local pxw,pzw = px1 * width * 0.5, -pz3 * height * 0.5
-        
-        --- View Matrix Processing
-        local vCX, vCY, vCZ, lEye =
-        getCamLocalRight(),
-        getCamLocalFwd(),
-        getCamLocalUp(),
-        getCameraLocalPos()
-        local lx,ly,lz = lEye[1],lEye[2],lEye[3]
-        local vx, vy, vz, vw = rotMatrixToQuat(vCX,vCY,vCZ)
-        local vW = solve(vCX,vCY,vCZ,lEye)
-        
-        -- View Matrix
-        local vXX,vXY,vXZ = vCX[1]*pxw,vCX[2]*pxw,vCX[3]*pxw
-        local vYX,vYY,vYZ = vCY[1], vCY[2], vCY[3]
-        local vZX,vZY,vZZ = vCZ[1]*pzw, vCZ[2]*pzw, vCZ[3]*pzw
-        local vXW,vYW,vZW = -vW[1]*pxw, -vW[2], -vW[3]*pzw
-
-        
-        -- Localize screen info
-        local objectGroupsArray,objectGroupSize = objectGroups.GetData()
-        local svgBuffer,svgZBuffer,svgBufferCounter = {},{},0
-
-
-        local processedNumber = 0
-        local processPure = ProcessPureModule
-        local processUI = ProcessUIModule
-        local processRots = ProcessOrientations
-        local renderUI = RenderUIElement
-        local processEvents = ProcessActionEvents
-        if processPure == nil then
-            processPure = function(zBC) return zBC end
-        end
-        if processUI == nil then
-            processUI = function(zBC) return zBC end
-            processRots = function() end
-            processEvents = function() end
-        end
-        local predefinedRotations = {}
-        local deltaPreProcessing = getTime() - startTime
-        local deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing = 0,0,0,0,0
-        for i = 1, objectGroupSize do
-            local drawProcessingStartTime = getTime()
-            local objectGroup = objectGroupsArray[i]
-            if objectGroup.enabled == false then
-                goto not_enabled
-            end
-            local objects = objectGroup.objects
-
-            local avgZ, avgZC = 0, 0
-            local zBuffer, zSorter, aBuffer, aSorter, aBC, zBC = {},{},{},{}, 0, 0
-
-            local notIntersected = true
-            for m = 1, #objects do
-                local obj = objects[m]
-                if not obj[1] then
-                    goto is_nil
-                end
-
-                obj.checkUpdate()
-                local objOri,objPos = obj[7],obj[8]
-                local mx, my, mz, mw = objOri[1], objOri[2], objOri[3], objOri[4]
-                local mW = solve(vCX, vCY, vCZ, objPos)
-                local vMX, vMY, vMZ, vMW = solve(mx,my,mz,mw, vx,vy,vz,vw)
-
-                local processRotations = processRots(predefinedRotations,vx,vy,vz,vw,pxw,pzw)
-                local vMXvMX, vMXvMY, vMXvMZ, vMXvMW, vMYvMY, vMYvMZ, vMYvMW, vMZvMZ, vMZvMW = 2*vMX*vMX, 2*vMX*vMY, 2*vMX*vMZ, 2*vMX*vMW, 2*vMY*vMY, 2*vMY*vMZ, 2*vMY*vMW, 2*vMZ*vMZ, 2*vMZ*vMW
-
-                local mXX, mXY, mXZ, mXW =
-                (1 - vMYvMY - vMZvMZ)*pxw,
-                (vMXvMY + vMZvMW)*pxw,
-                (vMXvMZ - vMYvMW)*pxw,
-                mW[1]*pxw + vXW
-
-                local mYX, mYY, mYZ, mYW =
-                (vMXvMY - vMZvMW),
-                (1 - vMXvMX - vMZvMZ),
-                (vMYvMZ + vMXvMW),
-                mW[2] + vYW
-
-                local mZX, mZY, mZZ, mZW =
-                (vMXvMZ + vMYvMW)*pzw,
-                (vMYvMZ - vMXvMW)*pzw,
-                (1 - vMXvMX - vMYvMY)*pzw,
-                mW[3]*pzw + vZW
-
-
-                predefinedRotations[mx .. ',' .. my .. ',' .. mz .. ',' .. mw] = {mXX,mXZ,mYX,mYZ,mZX,mZZ}
-
-                avgZ = avgZ + mYW
-                local uiGroups = obj[4]
-                
-                -- Process Actionables
-                obj.previousUI = processEvents(uiGroups, obj.previousUI, isClicked, isHolding, mYX, mYY, mYZ, mYW, vYX,vYY,vYZ, processRotations, lx,ly,lz, sort)
-                -- Progress Pure
-                zBC = processPure(zBC, obj[2], obj[3], zBuffer, zSorter,
-                    mXX, mXY, mXZ, mXW,
-                    mYX, mYY, mYZ, mYW,
-                    mZX, mZY, mZZ, mZW)
-                -- Process UI
-                zBC = processUI(zBC, uiGroups, zBuffer, zSorter,
-                    vXX,vXY,vXZ,
-                    vYX,vYY,vYZ,
-                    vZX,vZY,vZZ,
-                    vXW,vYW,vZW,
-                    processRotations,nearDivAspect)
-
-                ::is_nil::
-            end
-            local eventStartTime = getTime()
-            deltaDrawProcessing = deltaDrawProcessing + eventStartTime - drawProcessingStartTime
-            if aBC > 0 then
-                sort(aSorter)
-                oldSelected, hovered = ProcessUIEvents(aBuffer, zBuffer, aBC, oldSelected, isClicked, isHolding)
-            end
-            local zSortingStartTime = getTime()
-            deltaEvent = deltaEvent + zSortingStartTime - eventStartTime
-            if objectGroup.isZSorting then
-                sort(zSorter)
-            end
-            
-            local zBufferCopyStartTime = getTime()
-            deltaZSort = deltaZSort + zBufferCopyStartTime - zSortingStartTime
-            local drawStringData = {}
-            for zC = 1, zBC do
-                drawStringData[zC] = zBuffer[zSorter[zC]]
-            end
-            local postProcessingStartTime = getTime()
-            deltaZBufferCopy = deltaZBufferCopy + postProcessingStartTime - zBufferCopyStartTime
-            if zBC > 0 then
-                local dpth = avgZ / avgZC
-                local actualSVGCode = concat(drawStringData)
-                local beginning, ending = '', ''
-                if isSmooth then
-                    ending = '</div>'
-                    if frameRender then
-                        beginning = '<div class="second" style="visibility: hidden">'
-                    else
-                        beginning = '<style>.first{animation: f1 0.008s infinite linear;} .second{animation: f2 0.008s infinite linear;} @keyframes f1 {from {visibility: hidden;} to {visibility: hidden;}} @keyframes f2 {from {visibility: visible;} to { visibility: visible;}}</style><div class="first">'
-                    end
-                end
-                local styleHeader = ('<style>svg{background:none;width:%gpx;height:%gpx;position:absolute;top:0px;left:0px;}'):format(width,height)
-                local svgHeader = ('<svg viewbox="-%g -%g %g %g"'):format(width*0.5,height*0.5,width,height)
-                
-                svgBufferCounter = svgBufferCounter + 1
-                svgZBuffer[svgBufferCounter] = dpth
-                
-                if objectGroup.glow then
-                    local size
-                    if objectGroup.scale then
-                        size = atan(objectGroup.gRad, dpth) * nearDivAspect
-                    else
-                        size = objectGroup.gRad
-                    end
-                    svgBuffer[dpth] = concat({
-                                beginning,
-                                '<div class="', objectGroup.class ,'">',
-                                styleHeader,
-                                objectGroup.style,
-                                '.blur { filter: blur(',size,'px) brightness(60%) saturate(3);',
-                                objectGroup.gStyle, '}</style>',
-                                svgHeader,
-                                ' class="blur">',
-                                actualSVGCode,'</svg>',
-                                svgHeader, '>',
-                                actualSVGCode,
-                                '</svg></div>',
-                                ending
-                            })
-                    
-                else
-                    svgBuffer[dpth] = concat({
-                                beginning,
-                                '<div class="', objectGroup.class ,'">',
-                                styleHeader,
-                                objectGroup.style, '}</style>',
-                                svgHeader, '>',
-                                actualSVGCode,
-                                '</svg></div>',
-                                ending
-                            })
-                end
-            end
-            deltaPostProcessing = deltaPostProcessing + getTime() - postProcessingStartTime
-            ::not_enabled::
-        end
-        
-        sort(svgZBuffer)
-        
-        for i = 1, svgBufferCounter do
-            buffer[i] = svgBuffer[svgZBuffer[i]]
-        end
-        if frameRender then
-            frameBuffer[2] = concat(buffer)
-            return concat(frameBuffer), deltaPreProcessing, deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing
-        else
-            if isSmooth then
-                frameBuffer[1] = concat(buffer)
-            else
-                frameBuffer[1] = ''
-            end
-            return nil
-        end
-    end
-    return self
-end
 function LinkedList(name, prefix)
     local functions = {}
     local internalDataTable = {}
     local internalTableSize = 0
     local removeKey,addKey,indexKey,refKey = prefix .. 'Remove',prefix .. 'Add',prefix..'index',prefix..'ref'
     
-    functions[prefix .. 'Remove'] = function (node)
+    functions[removeKey] = function (node)
         local tblSize,internalDataTable = internalTableSize,internalDataTable
         if tblSize > 1 then
-            local prefixIndex = indexKey
-            if node[prefixIndex] == -1 then return end
-            local lastElement,replaceNodeIndex = internalDataTable[tblSize],node[prefixIndex]
+            if node[indexKey] == -1 then return end
+            local lastElement,replaceNodeIndex = internalDataTable[tblSize],node[indexKey]
             internalDataTable[replaceNodeIndex] = lastElement
             internalDataTable[tblSize] = nil
-            lastElement[prefixIndex] = replaceNodeIndex
+            lastElement[indexKey] = replaceNodeIndex
             internalTableSize = tblSize - 1
-            node[prefixIndex] = -1
+            node[indexKey] = -1
+            node[refKey] = nil
         elseif tblSize == 1 then
-            internalDataTable[tblSize] = nil
+            internalDataTable[1] = nil
             internalTableSize = 0
             node[indexKey] = -1
+            node[refKey] = nil
         end
     end
 
-    functions[prefix .. 'Add'] = function (node)
-        local indexKey,ref = indexKey,refKey
+    functions[addKey] = function (node, override)
+        local indexKey,refKey = indexKey,refKey
         if node[indexKey] and node[indexKey] ~= -1 then
-            node[ref][removeKey](node)
-        else
-            node[ref] = functions
+            if not node[refKey] == functions or override then
+                node[refKey][removeKey](node)
+            else
+                return
+            end
         end
         local tblSize = internalTableSize + 1
+        
         internalDataTable[tblSize] = node
         node[indexKey] = tblSize
+        node[refKey] = functions
         internalTableSize = tblSize
     end
 
@@ -350,7 +50,7 @@ end
 local math = math
 local sin, cos, rad, type = math.sin,math.cos,math.rad, type
 
-function rotMatrixToQuat(m1,m2,m3)
+function RotMatrixToQuat(m1,m2,m3)
     local m11,m22,m33 = m1[1],m2[2],m3[3]
     local t=m11+m22+m33
     if t>0 then
@@ -368,7 +68,7 @@ function rotMatrixToQuat(m1,m2,m3)
     end
 end
 
-function getQuaternion(x,y,z,w)
+function GetQuaternion(x,y,z,w)
     if type(x) == 'number' then
         if w == nil then
             if x == x and y == y and z == z then
@@ -393,25 +93,26 @@ function getQuaternion(x,y,z,w)
         end
     end
 end
-function quaternionMultiply(ax,ay,az,aw,bx,by,bz,bw)
+function QuaternionMultiply(ax,ay,az,aw,bx,by,bz,bw)
     return ax*bw+aw*bx+ay*bz-az*by,
     ay*bw+aw*by+az*bx-ax*bz,
     az*bw+aw*bz+ax*by-ay*bx,
     aw*bw-ax*bx-ay*by-az*bz
 end
-function rotatePoint(ax,ay,az,aw,oX,oY,oZ,wX,wY,wZ)
-    local axax,ayay,azaz,axaz,away,awax,axay,ayaz,awaz=ax*ax,ay*ay,az*az,ax*az,aw*ay,aw*ax,ax*ay,ay*az,aw*az
-    return 
-    2*(oY*(axay-awaz)+oZ*(axaz+away)+oX*(0.5-ayay-azaz))+wX,
-    2*(oX*(awaz+axay)+oZ*(ayaz-awax)+oY*(0.5-axax-azaz))+wY,
-    2*(oX*(axaz-away)+oY*(awax+ayaz)+oZ*(0.5-axax-ayay))+wZ    
-end
 
-function getRotationManager(out_rotation,wXYZ)
+function RotatePoint(ax,ay,az,aw,oX,oY,oZ,wX,wY,wZ)
+    local t1,t2,t3 = 2*(ay*oZ - az*oY), 2*(az*oX - ax*oZ), 2*(ax*oY - ay*oX)
+    
+    return 
+    oX + aw*t1 + ay*t3 - az*t2 + wX,
+    oY + (aw - ax)*t2 + az*t1 + wY,
+    oZ + aw*t3 + ax*t2 - ay*t1 + wZ
+end
+function getRotationManager(out_rotation,wXYZ, name)
     --====================--
     --Local Math Functions--
     --====================--
-    local print,type,unpack,multiply,rotatePoint,getQuaternion = DUSystem.print,type,table.unpack,quaternionMultiply,rotatePoint,getQuaternion
+    local print,type,unpack,multiply,rotatePoint,getQuaternion = DUSystem.print,type,table.unpack,QuaternionMultiply,RotatePoint,GetQuaternion
 
     local superManager,needsUpdate,needNormal = nil,false,false
     local outBubble = nil
@@ -431,7 +132,7 @@ function getRotationManager(out_rotation,wXYZ)
     local nx,ny,nz = 0,1,0
 
     local subRotQueue = {}
-    local subRotations = LinkedList('', 'sub')
+    local subRotations = LinkedList(name, 'sub')
 
     --==============--
     --Function Array--
@@ -459,7 +160,7 @@ function getRotationManager(out_rotation,wXYZ)
             dX,dY,dZ = pX,pY,pZ
         end
         if ww ~= 1 and ww ~= -1 then
-            wXYZ[1],wXYZ[2],wXYZ[3] = rotatePoint(wx,wy,wz,-ww,dX,dY,dZ,lTX,lTY,lTZ)
+            wXYZ[1],wXYZ[2],wXYZ[3] = RotatePoint(wx,wy,wz,-ww,dX,dY,dZ,lTX,lTY,lTZ)
             if iw ~= 1 then
                 wx,wy,wz,ww = multiply(wx,wy,wz,ww,ix,iy,iz,iw)
             end
@@ -475,10 +176,7 @@ function getRotationManager(out_rotation,wXYZ)
         end
         local subRots,subRotsSize = subRotations.subGetData()
         for i=1, subRotsSize do
-            local sub = subRots[i]
-            if sub then
-                sub.update(wx,wy,wz,ww,pX,pY,pZ,wXYZ[1],wXYZ[2],wXYZ[3])
-            end
+            subRots[i].update(wx,wy,wz,ww,pX,pY,pZ,wXYZ[1],wXYZ[2],wXYZ[3])
         end
         needsUpdate = false
     end
@@ -521,8 +219,15 @@ function getRotationManager(out_rotation,wXYZ)
 
     function out.addSubRotation(rotManager)
         rotManager.setSuperManager(out)
-        subRotations.subAdd(rotManager)
+        subRotations.subAdd(rotManager, true)
         out.bubble()
+    end
+    function out.remove()
+        if superManager then
+            superManager.removeSubRotation(out)
+            out.setSuperManager(false)
+            out.bubble()
+        end
     end
     function out.removeSubRotation(sub)
         sub.setSuperManager(false)
@@ -556,6 +261,7 @@ function getRotationManager(out_rotation,wXYZ)
         inFuncArr.update = process
         function inFuncArr.getPosition() return pX,pY,pZ end
         function inFuncArr.getRotationManger() return out end
+        function inFuncArr.getSubRotationData() return subRotations.subGetData() end
         inFuncArr.checkUpdate = out.checkUpdate
         function inFuncArr.setPosition(tx,ty,tz)
             if not (tx ~= tx or ty ~= ty or tz ~= tz)  then
@@ -574,13 +280,13 @@ function getRotationManager(out_rotation,wXYZ)
         function inFuncArr.rotateXYZ(rotX,rotY,rotZ,rotW)
             if rotX and rotY and rotZ then
                 tix,tiy,tiz,tiw = rotX,rotY,rotZ,rotW
-                rotate(false)
+                rotate()
                 if specialCall then specialCall() end
             else
                 if type(rotX) == 'table' then
                     if #rotX == 3 then
                         tix,tiy,tiz,tiw = rotX[1],rotX[2],rotX[3],nil
-                        local result = rotate(false)
+                        local result = rotate()
                         if specialCall then specialCall() end
                         goto valid  
                     end
@@ -603,266 +309,8 @@ function getRotationManager(out_rotation,wXYZ)
 
     return out
 end
-positionTypes = {
-    globalP=1,
-    localP=2
-}
-orientationTypes = {
-    globalO=1,
-    localO=2 
-}
-local print = DUSystem.print
-function ObjectGroup(objects, transX, transY)
-    local objects=objects or {}
-    local self={style='',gStyle='',class='default', objects=objects,transX=transX,transY=transY,enabled=true,glow=false,gRad=10,scale = false,isZSorting=true}
-    function self.addObject(object, id)
-        local id=id or #objects+1
-        objects[id]=object
-        return id
-    end
-    function self.removeObject(id) objects[id] = {} end
-
-    function self.hide() self.enabled = false end
-    function self.show() self.enabled = true end
-    function self.isEnabled() return self.enabled end
-    function self.setZSort(isZSorting) self.isZSorting = isZSorting end
-
-    function self.setClass(class) self.class = class end
-    function self.setStyle(style) self.style = style end
-    function self.setGlowStyle(gStyle) self.gStyle = gStyle end
-    function self.setGlow(enable,radius,scale) self.glow = enable; self.gRad = radius or self.gRad; self.scale = scale or false end 
-    return self
-end
-
-function Object(positionType, orientationType)
-
-    local multiGroup,singleGroup,uiGroups={},{},{}
-    local positionType=positionType
-    local orientationType=orientationType
-    local ori = {0,0,0,1}
-    local position = {0,0,0}
-    local objRotationHandler = getRotationManager(ori,position)
-    local defs = {}
-    local self = {
-        true, -- 1
-        multiGroup, -- 2
-        singleGroup, -- 3
-        uiGroups, -- 4
-        positionType, -- 5
-        orientationType, -- 6
-        ori, -- 7
-        position -- 8
-    }
-
-    objRotationHandler.assignFunctions(self)
-
-    function self.hide() self[1] = false end
-    function self.show() self[1] = true end
-
-    local loadUIModule = LoadUIModule
-    if loadUIModule == nil then
-        print('No UI Module installed.')
-        loadUIModule = function() end
-    end
-    local loadPureModule = LoadPureModule
-    if loadPureModule == nil then
-        print('No Pure Module installed.')
-        loadPureModule = function() end
-    end
-
-    loadPureModule(self, multiGroup, singleGroup)
-    loadUIModule(self, uiGroups, objRotationHandler)
-
-    function self.getRotationManager()
-        return objRotationHandler
-    end
-    function self.addSubObject(object)
-        object.setPositionIsRelative(true)
-        return objRotationHandler.addSubRotation(object.getRotationManager())
-    end
-    function self.removeSubObject(id)
-        objRotationHandler.removeSubRotation(id)
-    end
-
-    return self
-end
-
-function ObjectBuilderLinear()
-    local self = {}
-    function self.setPositionType(positionType)
-        local self = {}
-        local positionType = positionType
-        function self.setOrientationType(orientationType)
-            local self = {}
-            local orientationType = orientationType
-            function self.build()
-                return Object(positionType, orientationType)
-            end
-            return self
-        end
-        return self
-    end
-    return self
-end
-function LoadPureModule(self, singleGroup, multiGroup)
-    
-    function self.getMultiPointBuilder(groupId)
-        local builder = {}
-        local multiplePoints = LinkedList('','')
-        multiGroup[#multiGroup+1] = multiplePoints
-        function builder.addMultiPointSVG()
-            local shown = false
-            local pointSetX,pointSetY,pointSetZ={},{},{}
-            local mp = {pointSetX,pointSetY,pointSetZ,false,false}
-            local self={}
-            local pC=1
-            function self.show() 
-                if not shown then 
-                    shown = true
-                    multiplePoints.Add(mp)
-                end
-            end
-            function self.hide()
-                if shown then 
-                    shown = false
-                    multiplePoints.Remove(mp)
-                end
-            end
-            function self.addPoint(point)
-                pointSetX[pC]=point[1]
-                pointSetY[pC]=point[2]
-                pointSetZ[pC]=point[3]
-                pC=pC+1
-                return self
-            end
-            function self.setPoints(bulk)
-                for i=1,#bulk do
-                    local point = bulk[i]
-                    pointSetX[i]=point[1]
-                    pointSetY[i]=point[2]
-                    pointSetZ[i]=point[3]
-                end
-                pC=#bulk+1
-                return self
-            end
-            function self.setDrawFunction(draw)
-                mp[4] = draw
-                return self
-            end
-            function self.setData(dat)
-                mp[5] = dat
-                return self
-            end
-            function self.build()
-                if pC > 1 then
-                    multiplePoints.Add(mp)
-                    shown = true
-                else print("WARNING! Malformed multi-point build operation, no points specified. Ignoring.")
-                end
-            end
-            return self
-        end
-        return builder
-    end
-    
-    function self.getSinglePointBuilder(groupId)
-        local builder = {}
-        local points = LinkedList('','')
-        singleGroup[#singleGroup+1] = points
-        function builder.addSinglePointSVG()
-            local shown = false
-            local outArr = {false,false,false,false,false}
-
-            function self.setPosition(px,py,pz)
-                if type(px) == 'table' then
-                    outArr[1],outArr[2],outArr[3]=px[1],px[2],px[3]
-                else
-                    outArr[1],outArr[2],outArr[3]=px,py,pz
-                end
-                return self
-            end
-            
-            function self.setDrawFunction(draw)
-                outArr[4] = draw
-                return self
-            end
-            
-            function self.setData(dat)
-                outArr[5] = dat
-                return self
-            end
-            
-            function self.show()
-                if ~shown then
-                    shown = true
-                end
-            end
-            function self.hide() 
-                if shown then
-                    points.Remove(outArr)
-                    shown = false
-                end
-            end
-            function self.build()
-                points.Add(outArr)
-                shown = true
-                return self
-            end
-            return self
-        end
-        return builder
-    end
-end
-
-function ProcessPureModule(zBC, singleGroup, multiGroup, zBuffer, zSorter,
-        mXX, mXY, mXZ, mXW,
-        mYX, mYY, mYZ, mYW,
-        mZX, mZY, mZZ, mZW)
-    for cG = 1, #singleGroup do
-        local group = singleGroup[cG]
-        local singleGroups,singleSize = group.GetData()
-        for sGC = 1, singleSize do
-            local singleGroup = singleGroups[sGC]
-            local x,y,z = singleGroup[1], singleGroup[2], singleGroup[3]
-            local pz = mYX*x + mYY*y + mYZ*z + mYW
-            if pz < 0 then goto disabled end
-            zBC = zBC + 1
-            zSorter[zBC] = -pz
-            zBuffer[-pz] = singleGroup[4]((mXX*x + mXY*y + mXZ*z + mXW)/pz,(mZX*x + mZY*y + mZZ*z + mZW)/pz,pz,singleGroup[5])
-            ::disabled::
-        end
-    end
-    for cG = 1, #multiGroup do
-        local group = multiGroup[cG]
-        local multiGroups,groupSize = group.GetData()
-        for mGC = 1, groupSize do
-            local multiGroup = multiGroups[mGC]
-
-            local tPointsX,tPointsY,tPointsZ = {},{},{}
-            local pointsX,pointsY,pointsZ = multiGroup[1],multiGroup[2],multiGroup[3]
-            local size = #pointsX
-            local mGAvg,less = 0,0
-            for pC=1,size do
-                local x,y,z = pointsX[pC],pointsY[pC],pointsZ[pC]
-                local pz = mYX*x + mYY*y + mYZ*z + mYW
-                if pz < 0 then
-                    goto disabled
-                end
-
-                tPointsX[pC],tPointsY[pC] = (mXX*x + mXY*y + mXZ*z + mXW)/pz,(mZX*x + mZY*y + mZZ*z + mZW)/pz
-                mGAvg = mGAvg + pz
-            end
-            local depth = -mGAvg/size
-            zBC = zBC + 1
-            zSorter[zBC] = depth
-            zBuffer[depth] = multiGroup[4](tPointsX,tPointsY,depth,multiGroup[5])
-            ::disabled::
-        end
-    end
-    return zBC, dU
-end
 local atan = math.atan
-local unpack,pairs = table.unpack, pairs
+local unpack,pairs,print = table.unpack, pairs, DUSystem.print
 
 local TEXT_ARRAY = {
     lowercase = false,
@@ -963,7 +411,7 @@ function SetDefaultFont(font)
     if tmp then
         TEXT_ARRAY = require('Fonts/' .. font)
     else
-        system.print('ERROR: Font \'' .. font .. '\' not found!')
+        print('ERROR: Font \'' .. font .. '\' not found!')
     end
 end
 
@@ -974,7 +422,7 @@ function PathBuilder()
     local pc = 1
 
     local table = table
-    local concat,insert,pairs = table.concat, table.insert, pairs
+    local concat,insert,pairs,print = table.concat, table.insert, pairs, print
 
     local attributes = {
         Id = {nil,nil,'id','%s'},
@@ -1020,7 +468,7 @@ function PathBuilder()
             pc=pc+1
             c=c+4
         else
-            system.print('Invalid command for Smooth Cubic Curve, preceed with a cubic.')
+            print('Invalid command for Smooth Cubic Curve, preceed with a cubic.')
         end
         return builder
     end
@@ -1037,7 +485,7 @@ function PathBuilder()
             pc=pc+1
             c=c+2
         else
-            system.print('Invalid command for Smooth Quad Curve, preceed with a quad.')
+            print('Invalid command for Smooth Quad Curve, preceed with a quad.')
         end
         return builder
     end
@@ -1095,7 +543,7 @@ end
 
 function LoadUIModule(self, uiGroups, objectRotation)
     local rand = math.random
-    
+
     function self.setUIElements(groupId)
         groupId = groupId or 1
         local remove,unpack = table.remove,table.unpack
@@ -1136,10 +584,9 @@ function LoadUIModule(self, uiGroups, objectRotation)
             local actions = {false,false,false,false,false,false,false}
             local mainRotation = {0,0,0,1}
             local resultantPos = {x,y,z}
-            local mRot = getRotationManager(mainRotation,resultantPos)
+            local mRot = getRotationManager(mainRotation,resultantPos, 'Element')
             objectRotation.addSubRotation(mRot)
-            local subElementList = LinkedList('SubElement' , 'sub')
-           
+
             local elementData = {
                 false,
                 false,
@@ -1155,31 +602,26 @@ function LoadUIModule(self, uiGroups, objectRotation)
                 false
             }
             function elementData.addSubElement(element)
-                subElementList.subAdd(element)
-                element.parentElement = elementData
+                mRot.addSubRotation(element.getRotationManger())
             end
             function elementData.removeSubElement(element, deepDelete)
-                mRot.removeSubRotation(element)
-                element.parentElement = nil
+                mRot.removeSubRotation(element.getRotationManger())
                 if deepDelete then
                     element.remove(deepDelete)
+                else
+                    objectRotation.addSubRotation(element.getRotationManager())
                 end
             end
             function elementData.remove(deepDelete)
                 if not removed then
-                    local curSubList,size = subElementList.subGetData()
+                    local curSubList,size = mRot.getSubRotationData()
                     for i=1, size do
                         elementData.removeSubElement(curSubList[i], deepDelete)
                     end
 
                     DrawList.drawRemove(elementData)
                     ActionList.actionRemove(elementData)
-
-
-                    local parentNode = elementData.parentNode
-                    if parentNode then
-                        parentNode.removeSubElement(elementData, deepDelete)
-                    end
+                    mRot.remove()
                     removed = true
                 else
                     print('Error: Trying to remove an already removed element.')
@@ -1293,7 +735,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
             function elementData.setLeaveAction(action) actions[4] = action; actionCheck() end
             function elementData.setHoverAction(action) actions[5] = action; actionCheck() end
 
-            function elementData.setScale(scale) 
+            function elementData.setScale(scale)
                 elementData[5] = scale
             end
 
@@ -1325,7 +767,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
                 psY = sy
 
                 if updateHitbox then
-                    user.setBounds(createBounds(pointSetX,pointSetY,boundScale))
+                    elementData.setBounds(createBounds(pointSetX,pointSetY,boundScale))
                 end
             end
             local ogPointSetX,ogPointSetY
@@ -1355,7 +797,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
 
             function elementData.setDrawData(drawData) elementData[6] = drawData end
             function elementData.getDrawData() return elementData[6] end
-            function elementData.setSizes(sizes) 
+            function elementData.setSizes(sizes)
                 if not elementData[6] then
                     elementData[6] = {['sizes'] = sizes}
                 else
@@ -1365,9 +807,9 @@ function LoadUIModule(self, uiGroups, objectRotation)
 
             function elementData.getPoints() return elementData[7],elementData[8] end
 
-            function elementData.setPoints(pointsX,pointsY) 
-                if not pointsY then 
-                    user.addPoints(pointsX,true)
+            function elementData.setPoints(pointsX,pointsY)
+                if not pointsY then
+                    elementData.addPoints(pointsX)
                 else
                     pointSetX,pointSetY = pointsX,pointsY
                     elementData[7],elementData[8] = pointsX,pointsY
@@ -1397,7 +839,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
                 elseif elementData.getProgress then
                     typeOfElement = 'Progress Bar'
                 end
-                return '[' .. typeOfElement .. '] ' .. elementData[2] 
+                return '[' .. typeOfElement .. '] ' .. elementData[2]
             end
 
             function elementData.build(force, hasBounds)
@@ -1427,7 +869,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
                 if tmp then
                     fontSpace = require('Fonts/' .. font)
                 else
-                    system.print('ERROR: Font \'' .. font .. '\' not found! Defaulting')
+                    DUSystem.print('ERROR: Font \'' .. font .. '\' not found! Defaulting')
                 end
             end
             local textCache,offsetCacheX,offsetCacheY,txt = {},{},0,''
@@ -1573,9 +1015,12 @@ function LoadUIModule(self, uiGroups, objectRotation)
                 end
             end
             local oldUserFunc = userFunc.move
+            local prevx,prevy = 0,0
             function userFunc.move(x,y)
-                mx = mx + x
-                my = my + y
+                mx = mx - prevx + x
+                my = my - prevy + y
+                prevx = x
+                prevy = y
                 oldUserFunc(x,y)
             end
             function userFunc.setFontSize(size)
@@ -1675,12 +1120,12 @@ function LoadUIModule(self, uiGroups, objectRotation)
                     local xC = c[1]
 
                     local prog = (pX - points[sPointIndices[1]])/xC
-                    if prog < 0 then 
-                        return 0.001 
-                    elseif prog > 100 then 
-                        return 100 
-                    else 
-                        return prog 
+                    if prog < 0 then
+                        return 0.001
+                    elseif prog > 100 then
+                        return 100
+                    else
+                        return prog
                     end
                 end
                 return progress
@@ -1852,7 +1297,7 @@ function ProcessUIModule(zBC, uiGroups, zBuffer, zSorter,
             uC = uC + drawDataSize
             for ePC=1, #pointsX do
                 local ex, ez = pointsX[ePC]*scale, pointsY[ePC]*scale
-                
+
                 local pz = yxMult*ex + yzMult*ez + ywAdd
                 if pz < 0 then
                     goto behindElement
@@ -1862,14 +1307,14 @@ function ProcessUIModule(zBC, uiGroups, zBuffer, zSorter,
                 unpackData[uC + 1] = (zxMult*ex + zzMult*ez + zwAdd) / pz
                 uC = uC + 2
             end
-            
+
             zBC = zBC + 1
             zSorter[zBC] = -ywAdd
             zBuffer[-ywAdd] = el[12]:format(unpack(unpackData))
             ::behindElement::
         end
     end
-    return zBC, aBC
+    return zBC
 end
 
 function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, mYY, mYZ, mYW, vx,vy,vz, proc, P0XD,P0YD,P0ZD, sort)
@@ -1877,9 +1322,9 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
     for i=1, #uiGroups do
         local elGroup = uiGroups[i]
         local elements,size = elGroup[2].actionGetData()
-        for i=1,size do
-            local el = elements[i]
-            local eO = el[9] 
+        for m=1,size do
+            local el = elements[m]
+            local eO = el[9]
             local eX, eY, eZ = eO[1], eO[2], eO[3]
 
             local eCZ = mYX*eX + mYY*eY + mYZ*eZ + mYW
@@ -1887,14 +1332,12 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
                 goto behindElement
             end
 
-            local actions = el[4]
-            
             aBC = aBC + 1
             local p0X, p0Y, p0Z = P0XD - eX, P0YD - eY, P0ZD - eZ
 
             local NX, NY, NZ = el.getNormal()
             local t = -(p0X*NX + p0Y*NY + p0Z*NZ)/(vx*NX + vy*NY + vz*NZ)
-            
+
             local function Process()
                 local el = el
                 local pMR,t = proc(el),t
@@ -1904,7 +1347,7 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
                     local oRM = el[11]
                     local fx,fy,fz,fw = oRM[1],oRM[2],oRM[3],oRM[4]
                     local fxfz,fyfy,fyfw = fx*fz,fy*fy,fy*fw
-                    pMR[7],pMR[8],pMR[9],pMR[10],pMR[11],pMR[12] = 
+                    pMR[7],pMR[8],pMR[9],pMR[10],pMR[11],pMR[12] =
                     2*(0.5-fyfy-fz*fz),
                     2*(fx*fy - fz*fw),
                     2*(fxfz + fyfw),
@@ -1917,7 +1360,7 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
 
                 local pX, pZ = pMR[7]*px + pMR[8]*py + pMR[9]*pz, pMR[10]*px + pMR[11]*py + pMR[12]*pz
                 if type(eBounds) == "function" then
-                   inside = eBounds(pX, pZ, zDepth)
+                   inside = eBounds(pX, pZ, t)
                 else
                     local eBX,eBY = eBounds[1],eBounds[2]
                     local N = #eBX + 1
@@ -1956,7 +1399,7 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
                     return false
                 end
                 local actions,clickDraw,hoverDraw = el[4],el[3],el[1]
-               
+
                 if not oldSelected then
                     local enter = actions[3]
                     if enter then
@@ -1991,7 +1434,7 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
                     end
                     el[12] = hoverDraw
                     local leave = oldSelected[2][4]
-                    
+
                     oldSelected[1][12] = oldSelected[1][2]
                     if leave then
                         leave(oldSelected[1], oldSelected[3], oldSelected[4])
@@ -2021,4 +1464,554 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
         end
     end
     return newSelected
+end
+function Projector()
+    -- Localize frequently accessed data
+    local construct, player, system, math = DUConstruct, DUPlayer, DUSystem, math
+    
+    -- Internal Parameters
+    local frameBuffer,frameCounter,isSmooth = {''},true,true
+
+    -- Localize frequently accessed functions
+    --- System-based function calls
+    local getWidth, getHeight, getTime =
+    system.getScreenWidth,
+    system.getScreenHeight,
+    system.getArkTime
+
+    --- Core-based function calls
+    local getCWorldR, getCWorldF, getCWorldU, getCWorldPos =
+    construct.getWorldRight,
+    construct.getWorldForward,
+    construct.getWorldUp,
+    construct.getWorldPosition
+
+    --- Camera-based function calls
+    local getCameraLocalPos = system.getCameraPos
+    local getCamLocalFwd, getCamLocalRight, getCamLocalUp =
+    system.getCameraForward,
+    system.getCameraRight,
+    system.getCameraUp
+
+    --- Manager-based function calls
+    ---- Quaternion operations
+    local rotMatrixToQuat,solveMat,quatMulti = RotMatrixToQuat,DULibrary.systemResolution3,QuaternionMultiply
+    local function solve(mx,my,mz,mw,ix,iy,iz,iw)
+        if ix then return quatMulti(mx,my,mz,mw,ix,iy,iz,iw) else return solveMat(mx,my,mz,mw) end
+    end
+    
+    -- Localize Math functions
+    local tan, atan, rad = math.tan, math.atan, math.rad
+
+    --- FOV Paramters
+    local horizontalFov = system.getCameraHorizontalFov
+    local fnearDivAspect = 0
+
+    local objectGroups = LinkedList('Group', '')
+
+    local self = {}
+  
+    function self.getSize(size, zDepth, max, min)
+        local pSize = atan(size, zDepth) * fnearDivAspect
+        if max then
+            if pSize >= max then
+                return max
+            else
+                if min then
+                    if pSize < min then
+                        return min
+                    end
+                end
+                return pSize
+            end
+        end
+        return pSize
+    end
+
+    function self.setSmooth(iss) isSmooth = iss end
+
+    function self.addObjectGroup(objectGroup) objectGroups.Add(objectGroup) end
+
+    function self.removeObjectGroup(objectGroup) objectGroups.Remove(objectGroup) end
+    
+    function self.getSVG()
+        local getTime, atan, sort, format, concat = getTime, atan, table.sort, string.format, table.concat
+        local startTime = getTime()
+        frameRender = not frameRender
+        local isClicked = false
+        if clicked then
+            clicked = false
+            isClicked = true
+        end
+        local isHolding = holding
+
+        local buffer = {}
+
+        local width,height = getWidth(), getHeight()
+        local aspect = width/height
+        local tanFov = tan(rad(horizontalFov() * 0.5))
+        
+        --- Matrix Subprocessing
+        local nearDivAspect = (width*0.5) / tanFov
+        fnearDivAspect = nearDivAspect
+
+        -- Localize projection matrix values
+        local px1 = 1 / tanFov
+        local pz3 = px1 * aspect
+
+        local pxw,pzw = px1 * width * 0.5, -pz3 * height * 0.5
+        
+        --- View Matrix Processing
+        local vCX, vCY, vCZ, lEye =
+        getCamLocalRight(),
+        getCamLocalFwd(),
+        getCamLocalUp(),
+        getCameraLocalPos()
+        local lx,ly,lz = lEye[1],lEye[2],lEye[3]
+        local vx, vy, vz, vw = rotMatrixToQuat(vCX,vCY,vCZ)
+        local vW = solve(vCX,vCY,vCZ,lEye)
+        
+        -- View Matrix
+        local vXX,vXY,vXZ = vCX[1]*pxw,vCX[2]*pxw,vCX[3]*pxw
+        local vYX,vYY,vYZ = vCY[1], vCY[2], vCY[3]
+        local vZX,vZY,vZZ = vCZ[1]*pzw, vCZ[2]*pzw, vCZ[3]*pzw
+        local vXW,vYW,vZW = -vW[1]*pxw, -vW[2], -vW[3]*pzw
+
+        
+        -- Localize screen info
+        local objectGroupsArray,objectGroupSize = objectGroups.GetData()
+        local svgBuffer,svgZBuffer,svgBufferCounter = {},{},0
+
+        local processPure = ProcessPureModule
+        local processUI = ProcessUIModule
+        local processRots = ProcessOrientations
+        local processEvents = ProcessActionEvents
+        if processPure == nil then
+            processPure = function(zBC) return zBC end
+        end
+        if processUI == nil then
+            processUI = function(zBC) return zBC end
+            processRots = function() end
+            processEvents = function() end
+        end
+        local predefinedRotations = {}
+        local deltaPreProcessing = getTime() - startTime
+        local deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing = 0,0,0,0,0
+        for i = 1, objectGroupSize do
+            local objectGroup = objectGroupsArray[i]
+            if objectGroup.enabled == false then
+                goto not_enabled
+            end
+            local objects = objectGroup.objects
+
+            local avgZ, avgZC = 0, 0
+            local zBuffer, zSorter, zBC = {},{}, 0
+
+            local notIntersected = true
+            for m = 1, #objects do
+                local obj = objects[m]
+                if not obj[1] then
+                    goto is_nil
+                end
+
+                obj.checkUpdate()
+                local objOri,objPos = obj[7],obj[8]
+                local mx, my, mz, mw = objOri[1], objOri[2], objOri[3], objOri[4]
+                local mW = solve(vCX, vCY, vCZ, objPos)
+                local vMX, vMY, vMZ, vMW = solve(mx,my,mz,mw, vx,vy,vz,vw)
+
+                local processRotations = processRots(predefinedRotations,vx,vy,vz,vw,pxw,pzw)
+                local vMXvMX, vMXvMY, vMXvMZ, vMXvMW, vMYvMY, vMYvMZ, vMYvMW, vMZvMZ, vMZvMW = 2*vMX*vMX, 2*vMX*vMY, 2*vMX*vMZ, 2*vMX*vMW, 2*vMY*vMY, 2*vMY*vMZ, 2*vMY*vMW, 2*vMZ*vMZ, 2*vMZ*vMW
+
+                local mXX, mXY, mXZ, mXW =
+                (1 - vMYvMY - vMZvMZ)*pxw,
+                (vMXvMY + vMZvMW)*pxw,
+                (vMXvMZ - vMYvMW)*pxw,
+                mW[1]*pxw + vXW
+
+                local mYX, mYY, mYZ, mYW =
+                (vMXvMY - vMZvMW),
+                (1 - vMXvMX - vMZvMZ),
+                (vMYvMZ + vMXvMW),
+                mW[2] + vYW
+
+                local mZX, mZY, mZZ, mZW =
+                (vMXvMZ + vMYvMW)*pzw,
+                (vMYvMZ - vMXvMW)*pzw,
+                (1 - vMXvMX - vMYvMY)*pzw,
+                mW[3]*pzw + vZW
+
+
+                predefinedRotations[mx .. ',' .. my .. ',' .. mz .. ',' .. mw] = {mXX,mXZ,mYX,mYZ,mZX,mZZ}
+
+                avgZ = avgZ + mYW
+                local uiGroups = obj[4]
+                
+                -- Process Actionables
+                local eventStartTime = getTime()
+                obj.previousUI = processEvents(uiGroups, obj.previousUI, isClicked, isHolding, mYX, mYY, mYZ, mYW, vYX,vYY,vYZ, processRotations, lx,ly,lz, sort)
+                local drawProcessingStartTime = getTime();
+                deltaEvent = deltaEvent + drawProcessingStartTime - eventStartTime
+                -- Progress Pure
+                
+                zBC = processPure(zBC, obj[2], obj[3], zBuffer, zSorter,
+                    mXX, mXY, mXZ, mXW,
+                    mYX, mYY, mYZ, mYW,
+                    mZX, mZY, mZZ, mZW)
+                -- Process UI
+                zBC = processUI(zBC, uiGroups, zBuffer, zSorter,
+                    vXX,vXY,vXZ,
+                    vYX,vYY,vYZ,
+                    vZX,vZY,vZZ,
+                    vXW,vYW,vZW,
+                    processRotations,nearDivAspect)
+                deltaDrawProcessing = deltaDrawProcessing + getTime() - drawProcessingStartTime
+                ::is_nil::
+            end
+            local zSortingStartTime = getTime()
+            if objectGroup.isZSorting then
+                sort(zSorter)
+            end
+            local zBufferCopyStartTime = getTime()
+            deltaZSort = deltaZSort + zBufferCopyStartTime - zSortingStartTime
+            local drawStringData = {}
+            for zC = 1, zBC do
+                drawStringData[zC] = zBuffer[zSorter[zC]]
+            end
+            local postProcessingStartTime = getTime()
+            deltaZBufferCopy = deltaZBufferCopy + postProcessingStartTime - zBufferCopyStartTime
+            if zBC > 0 then
+                local dpth = avgZ / avgZC
+                local actualSVGCode = concat(drawStringData)
+                local beginning, ending = '', ''
+                if isSmooth then
+                    ending = '</div>'
+                    if frameRender then
+                        beginning = '<div class="second" style="visibility: hidden">'
+                    else
+                        beginning = '<style>.first{animation: f1 0.008s infinite linear;} .second{animation: f2 0.008s infinite linear;} @keyframes f1 {from {visibility: hidden;} to {visibility: hidden;}} @keyframes f2 {from {visibility: visible;} to { visibility: visible;}}</style><div class="first">'
+                    end
+                end
+                local styleHeader = ('<style>svg{background:none;width:%gpx;height:%gpx;position:absolute;top:0px;left:0px;}'):format(width,height)
+                local svgHeader = ('<svg viewbox="-%g -%g %g %g"'):format(width*0.5,height*0.5,width,height)
+                
+                svgBufferCounter = svgBufferCounter + 1
+                svgZBuffer[svgBufferCounter] = dpth
+                
+                if objectGroup.glow then
+                    local size
+                    if objectGroup.scale then
+                        size = atan(objectGroup.gRad, dpth) * nearDivAspect
+                    else
+                        size = objectGroup.gRad
+                    end
+                    svgBuffer[dpth] = concat({
+                                beginning,
+                                '<div class="', objectGroup.class ,'">',
+                                styleHeader,
+                                objectGroup.style,
+                                '.blur { filter: blur(',size,'px) brightness(60%) saturate(3);',
+                                objectGroup.gStyle, '}</style>',
+                                svgHeader,
+                                ' class="blur">',
+                                actualSVGCode,'</svg>',
+                                svgHeader, '>',
+                                actualSVGCode,
+                                '</svg></div>',
+                                ending
+                            })
+                    
+                else
+                    svgBuffer[dpth] = concat({
+                                beginning,
+                                '<div class="', objectGroup.class ,'">',
+                                styleHeader,
+                                objectGroup.style, '}</style>',
+                                svgHeader, '>',
+                                actualSVGCode,
+                                '</svg></div>',
+                                ending
+                            })
+                end
+            end
+            deltaPostProcessing = deltaPostProcessing + getTime() - postProcessingStartTime
+            ::not_enabled::
+        end
+        
+        sort(svgZBuffer)
+        
+        for i = 1, svgBufferCounter do
+            buffer[i] = svgBuffer[svgZBuffer[i]]
+        end
+        if frameRender then
+            frameBuffer[2] = concat(buffer)
+            return concat(frameBuffer), deltaPreProcessing, deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing
+        else
+            if isSmooth then
+                frameBuffer[1] = concat(buffer)
+            else
+                frameBuffer[1] = ''
+            end
+            return nil
+        end
+    end
+    return self
+end
+function LoadPureModule(self, singleGroup, multiGroup)
+    
+    function self.getMultiPointBuilder(groupId)
+        local builder = {}
+        local multiplePoints = LinkedList('','')
+        multiGroup[#multiGroup+1] = multiplePoints
+        function builder.addMultiPointSVG()
+            local shown = false
+            local pointSetX,pointSetY,pointSetZ={},{},{}
+            local mp = {pointSetX,pointSetY,pointSetZ,false,false}
+            local self={}
+            local pC=1
+            function self.show() 
+                if not shown then 
+                    shown = true
+                    multiplePoints.Add(mp)
+                end
+            end
+            function self.hide()
+                if shown then 
+                    shown = false
+                    multiplePoints.Remove(mp)
+                end
+            end
+            function self.addPoint(point)
+                pointSetX[pC]=point[1]
+                pointSetY[pC]=point[2]
+                pointSetZ[pC]=point[3]
+                pC=pC+1
+                return self
+            end
+            function self.setPoints(bulk)
+                for i=1,#bulk do
+                    local point = bulk[i]
+                    pointSetX[i]=point[1]
+                    pointSetY[i]=point[2]
+                    pointSetZ[i]=point[3]
+                end
+                pC=#bulk+1
+                return self
+            end
+            function self.setDrawFunction(draw)
+                mp[4] = draw
+                return self
+            end
+            function self.setData(dat)
+                mp[5] = dat
+                return self
+            end
+            function self.build()
+                if pC > 1 then
+                    multiplePoints.Add(mp)
+                    shown = true
+                else print("WARNING! Malformed multi-point build operation, no points specified. Ignoring.")
+                end
+            end
+            return self
+        end
+        return builder
+    end
+    
+    function self.getSinglePointBuilder(groupId)
+        local builder = {}
+        local points = LinkedList('','')
+        singleGroup[#singleGroup+1] = points
+        function builder.addSinglePointSVG()
+            local shown = false
+            local outArr = {false,false,false,false,false}
+
+            function self.setPosition(px,py,pz)
+                if type(px) == 'table' then
+                    outArr[1],outArr[2],outArr[3]=px[1],px[2],px[3]
+                else
+                    outArr[1],outArr[2],outArr[3]=px,py,pz
+                end
+                return self
+            end
+            
+            function self.setDrawFunction(draw)
+                outArr[4] = draw
+                return self
+            end
+            
+            function self.setData(dat)
+                outArr[5] = dat
+                return self
+            end
+            
+            function self.show()
+                if ~shown then
+                    shown = true
+                end
+            end
+            function self.hide() 
+                if shown then
+                    points.Remove(outArr)
+                    shown = false
+                end
+            end
+            function self.build()
+                points.Add(outArr)
+                shown = true
+                return self
+            end
+            return self
+        end
+        return builder
+    end
+end
+
+function ProcessPureModule(zBC, singleGroup, multiGroup, zBuffer, zSorter,
+        mXX, mXY, mXZ, mXW,
+        mYX, mYY, mYZ, mYW,
+        mZX, mZY, mZZ, mZW)
+    for cG = 1, #singleGroup do
+        local group = singleGroup[cG]
+        local singleGroups,singleSize = group.GetData()
+        for sGC = 1, singleSize do
+            local singleGroup = singleGroups[sGC]
+            local x,y,z = singleGroup[1], singleGroup[2], singleGroup[3]
+            local pz = mYX*x + mYY*y + mYZ*z + mYW
+            if pz < 0 then goto disabled end
+            zBC = zBC + 1
+            zSorter[zBC] = -pz
+            zBuffer[-pz] = singleGroup[4]((mXX*x + mXY*y + mXZ*z + mXW)/pz,(mZX*x + mZY*y + mZZ*z + mZW)/pz,pz,singleGroup[5])
+            ::disabled::
+        end
+    end
+    for cG = 1, #multiGroup do
+        local group = multiGroup[cG]
+        local multiGroups,groupSize = group.GetData()
+        for mGC = 1, groupSize do
+            local multiGroup = multiGroups[mGC]
+
+            local tPointsX,tPointsY,tPointsZ = {},{},{}
+            local pointsX,pointsY,pointsZ = multiGroup[1],multiGroup[2],multiGroup[3]
+            local size = #pointsX
+            local mGAvg = 0
+            for pC=1,size do
+                local x,y,z = pointsX[pC],pointsY[pC],pointsZ[pC]
+                local pz = mYX*x + mYY*y + mYZ*z + mYW
+                if pz < 0 then
+                    goto disabled
+                end
+
+                tPointsX[pC],tPointsY[pC] = (mXX*x + mXY*y + mXZ*z + mXW)/pz,(mZX*x + mZY*y + mZZ*z + mZW)/pz
+                mGAvg = mGAvg + pz
+            end
+            local depth = -mGAvg/size
+            zBC = zBC + 1
+            zSorter[zBC] = depth
+            zBuffer[depth] = multiGroup[4](tPointsX,tPointsY,depth,multiGroup[5])
+            ::disabled::
+        end
+    end
+    return zBC
+end
+positionTypes = {
+    globalP=1,
+    localP=2
+}
+orientationTypes = {
+    globalO=1,
+    localO=2 
+}
+local print = DUSystem.print
+function ObjectGroup(objects, transX, transY)
+    local objects=objects or {}
+    local self={style='',gStyle='',class='default', objects=objects,transX=transX,transY=transY,enabled=true,glow=false,gRad=10,scale = false,isZSorting=true}
+    function self.addObject(object, id)
+        local id=id or #objects+1
+        objects[id]=object
+        return id
+    end
+    function self.removeObject(id) objects[id] = {} end
+
+    function self.hide() self.enabled = false end
+    function self.show() self.enabled = true end
+    function self.isEnabled() return self.enabled end
+    function self.setZSort(isZSorting) self.isZSorting = isZSorting end
+
+    function self.setClass(class) self.class = class end
+    function self.setStyle(style) self.style = style end
+    function self.setGlowStyle(gStyle) self.gStyle = gStyle end
+    function self.setGlow(enable,radius,scale) self.glow = enable; self.gRad = radius or self.gRad; self.scale = scale or false end 
+    return self
+end
+
+function Object(positionType, orientationType)
+
+    local multiGroup,singleGroup,uiGroups={},{},{}
+    local positionType=positionType
+    local orientationType=orientationType
+    local ori = {0,0,0,1}
+    local position = {0,0,0}
+    local objRotationHandler = getRotationManager(ori,position, 'Object Rotation Handler')
+    local defs = {}
+    local self = {
+        true, -- 1
+        multiGroup, -- 2
+        singleGroup, -- 3
+        uiGroups, -- 4
+        positionType, -- 5
+        orientationType, -- 6
+        ori, -- 7
+        position -- 8
+    }
+
+    objRotationHandler.assignFunctions(self)
+
+    function self.hide() self[1] = false end
+    function self.show() self[1] = true end
+
+    local loadUIModule = LoadUIModule
+    if loadUIModule == nil then
+        print('No UI Module installed.')
+        loadUIModule = function() end
+    end
+    local loadPureModule = LoadPureModule
+    if loadPureModule == nil then
+        print('No Pure Module installed.')
+        loadPureModule = function() end
+    end
+
+    loadPureModule(self, multiGroup, singleGroup)
+    loadUIModule(self, uiGroups, objRotationHandler)
+
+    function self.getRotationManager()
+        return objRotationHandler
+    end
+    function self.addSubObject(object)
+        object.setPositionIsRelative(true)
+        return objRotationHandler.addSubRotation(object.getRotationManager())
+    end
+    function self.removeSubObject(id)
+        objRotationHandler.removeSubRotation(id)
+    end
+
+    return self
+end
+
+function ObjectBuilderLinear()
+    local self = {}
+    function self.setPositionType(positionType)
+        local self = {}
+        local positionType = positionType
+        function self.setOrientationType(orientationType)
+            local self = {}
+            local orientationType = orientationType
+            function self.build()
+                return Object(positionType, orientationType)
+            end
+            return self
+        end
+        return self
+    end
+    return self
 end

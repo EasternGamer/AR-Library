@@ -1,5 +1,5 @@
 local atan = math.atan
-local unpack,pairs = table.unpack, pairs
+local unpack,pairs,print = table.unpack, pairs, DUSystem.print
 
 local TEXT_ARRAY = {
     lowercase = false,
@@ -100,7 +100,7 @@ function SetDefaultFont(font)
     if tmp then
         TEXT_ARRAY = require('Fonts/' .. font)
     else
-        system.print('ERROR: Font \'' .. font .. '\' not found!')
+        print('ERROR: Font \'' .. font .. '\' not found!')
     end
 end
 
@@ -111,7 +111,7 @@ function PathBuilder()
     local pc = 1
 
     local table = table
-    local concat,insert,pairs = table.concat, table.insert, pairs
+    local concat,insert,pairs,print = table.concat, table.insert, pairs, print
 
     local attributes = {
         Id = {nil,nil,'id','%s'},
@@ -157,7 +157,7 @@ function PathBuilder()
             pc=pc+1
             c=c+4
         else
-            system.print('Invalid command for Smooth Cubic Curve, preceed with a cubic.')
+            print('Invalid command for Smooth Cubic Curve, preceed with a cubic.')
         end
         return builder
     end
@@ -174,7 +174,7 @@ function PathBuilder()
             pc=pc+1
             c=c+2
         else
-            system.print('Invalid command for Smooth Quad Curve, preceed with a quad.')
+            print('Invalid command for Smooth Quad Curve, preceed with a quad.')
         end
         return builder
     end
@@ -232,7 +232,7 @@ end
 
 function LoadUIModule(self, uiGroups, objectRotation)
     local rand = math.random
-    
+
     function self.setUIElements(groupId)
         groupId = groupId or 1
         local remove,unpack = table.remove,table.unpack
@@ -275,7 +275,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
             local resultantPos = {x,y,z}
             local mRot = getRotationManager(mainRotation,resultantPos, 'Element')
             objectRotation.addSubRotation(mRot)
-           
+
             local elementData = {
                 false,
                 false,
@@ -424,7 +424,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
             function elementData.setLeaveAction(action) actions[4] = action; actionCheck() end
             function elementData.setHoverAction(action) actions[5] = action; actionCheck() end
 
-            function elementData.setScale(scale) 
+            function elementData.setScale(scale)
                 elementData[5] = scale
             end
 
@@ -456,7 +456,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
                 psY = sy
 
                 if updateHitbox then
-                    user.setBounds(createBounds(pointSetX,pointSetY,boundScale))
+                    elementData.setBounds(createBounds(pointSetX,pointSetY,boundScale))
                 end
             end
             local ogPointSetX,ogPointSetY
@@ -486,7 +486,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
 
             function elementData.setDrawData(drawData) elementData[6] = drawData end
             function elementData.getDrawData() return elementData[6] end
-            function elementData.setSizes(sizes) 
+            function elementData.setSizes(sizes)
                 if not elementData[6] then
                     elementData[6] = {['sizes'] = sizes}
                 else
@@ -496,9 +496,9 @@ function LoadUIModule(self, uiGroups, objectRotation)
 
             function elementData.getPoints() return elementData[7],elementData[8] end
 
-            function elementData.setPoints(pointsX,pointsY) 
-                if not pointsY then 
-                    user.addPoints(pointsX,true)
+            function elementData.setPoints(pointsX,pointsY)
+                if not pointsY then
+                    elementData.addPoints(pointsX)
                 else
                     pointSetX,pointSetY = pointsX,pointsY
                     elementData[7],elementData[8] = pointsX,pointsY
@@ -528,7 +528,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
                 elseif elementData.getProgress then
                     typeOfElement = 'Progress Bar'
                 end
-                return '[' .. typeOfElement .. '] ' .. elementData[2] 
+                return '[' .. typeOfElement .. '] ' .. elementData[2]
             end
 
             function elementData.build(force, hasBounds)
@@ -558,7 +558,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
                 if tmp then
                     fontSpace = require('Fonts/' .. font)
                 else
-                    system.print('ERROR: Font \'' .. font .. '\' not found! Defaulting')
+                    DUSystem.print('ERROR: Font \'' .. font .. '\' not found! Defaulting')
                 end
             end
             local textCache,offsetCacheX,offsetCacheY,txt = {},{},0,''
@@ -809,12 +809,12 @@ function LoadUIModule(self, uiGroups, objectRotation)
                     local xC = c[1]
 
                     local prog = (pX - points[sPointIndices[1]])/xC
-                    if prog < 0 then 
-                        return 0.001 
-                    elseif prog > 100 then 
-                        return 100 
-                    else 
-                        return prog 
+                    if prog < 0 then
+                        return 0.001
+                    elseif prog > 100 then
+                        return 100
+                    else
+                        return prog
                     end
                 end
                 return progress
@@ -986,7 +986,7 @@ function ProcessUIModule(zBC, uiGroups, zBuffer, zSorter,
             uC = uC + drawDataSize
             for ePC=1, #pointsX do
                 local ex, ez = pointsX[ePC]*scale, pointsY[ePC]*scale
-                
+
                 local pz = yxMult*ex + yzMult*ez + ywAdd
                 if pz < 0 then
                     goto behindElement
@@ -996,14 +996,14 @@ function ProcessUIModule(zBC, uiGroups, zBuffer, zSorter,
                 unpackData[uC + 1] = (zxMult*ex + zzMult*ez + zwAdd) / pz
                 uC = uC + 2
             end
-            
+
             zBC = zBC + 1
             zSorter[zBC] = -ywAdd
             zBuffer[-ywAdd] = el[12]:format(unpack(unpackData))
             ::behindElement::
         end
     end
-    return zBC, aBC
+    return zBC
 end
 
 function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, mYY, mYZ, mYW, vx,vy,vz, proc, P0XD,P0YD,P0ZD, sort)
@@ -1011,9 +1011,9 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
     for i=1, #uiGroups do
         local elGroup = uiGroups[i]
         local elements,size = elGroup[2].actionGetData()
-        for i=1,size do
-            local el = elements[i]
-            local eO = el[9] 
+        for m=1,size do
+            local el = elements[m]
+            local eO = el[9]
             local eX, eY, eZ = eO[1], eO[2], eO[3]
 
             local eCZ = mYX*eX + mYY*eY + mYZ*eZ + mYW
@@ -1021,14 +1021,12 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
                 goto behindElement
             end
 
-            local actions = el[4]
-            
             aBC = aBC + 1
             local p0X, p0Y, p0Z = P0XD - eX, P0YD - eY, P0ZD - eZ
 
             local NX, NY, NZ = el.getNormal()
             local t = -(p0X*NX + p0Y*NY + p0Z*NZ)/(vx*NX + vy*NY + vz*NZ)
-            
+
             local function Process()
                 local el = el
                 local pMR,t = proc(el),t
@@ -1038,7 +1036,7 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
                     local oRM = el[11]
                     local fx,fy,fz,fw = oRM[1],oRM[2],oRM[3],oRM[4]
                     local fxfz,fyfy,fyfw = fx*fz,fy*fy,fy*fw
-                    pMR[7],pMR[8],pMR[9],pMR[10],pMR[11],pMR[12] = 
+                    pMR[7],pMR[8],pMR[9],pMR[10],pMR[11],pMR[12] =
                     2*(0.5-fyfy-fz*fz),
                     2*(fx*fy - fz*fw),
                     2*(fxfz + fyfw),
@@ -1051,7 +1049,7 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
 
                 local pX, pZ = pMR[7]*px + pMR[8]*py + pMR[9]*pz, pMR[10]*px + pMR[11]*py + pMR[12]*pz
                 if type(eBounds) == "function" then
-                   inside = eBounds(pX, pZ, zDepth)
+                   inside = eBounds(pX, pZ, t)
                 else
                     local eBX,eBY = eBounds[1],eBounds[2]
                     local N = #eBX + 1
@@ -1090,7 +1088,7 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
                     return false
                 end
                 local actions,clickDraw,hoverDraw = el[4],el[3],el[1]
-               
+
                 if not oldSelected then
                     local enter = actions[3]
                     if enter then
@@ -1125,7 +1123,7 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
                     end
                     el[12] = hoverDraw
                     local leave = oldSelected[2][4]
-                    
+
                     oldSelected[1][12] = oldSelected[1][2]
                     if leave then
                         leave(oldSelected[1], oldSelected[3], oldSelected[4])

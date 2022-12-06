@@ -280,13 +280,13 @@ function getRotationManager(out_rotation,wXYZ, name)
         function inFuncArr.rotateXYZ(rotX,rotY,rotZ,rotW)
             if rotX and rotY and rotZ then
                 tix,tiy,tiz,tiw = rotX,rotY,rotZ,rotW
-                rotate(false)
+                rotate()
                 if specialCall then specialCall() end
             else
                 if type(rotX) == 'table' then
                     if #rotX == 3 then
                         tix,tiy,tiz,tiw = rotX[1],rotX[2],rotX[3],nil
-                        local result = rotate(false)
+                        local result = rotate()
                         if specialCall then specialCall() end
                         goto valid  
                     end

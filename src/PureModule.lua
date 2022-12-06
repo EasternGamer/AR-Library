@@ -135,7 +135,7 @@ function ProcessPureModule(zBC, singleGroup, multiGroup, zBuffer, zSorter,
             local tPointsX,tPointsY,tPointsZ = {},{},{}
             local pointsX,pointsY,pointsZ = multiGroup[1],multiGroup[2],multiGroup[3]
             local size = #pointsX
-            local mGAvg,less = 0,0
+            local mGAvg = 0
             for pC=1,size do
                 local x,y,z = pointsX[pC],pointsY[pC],pointsZ[pC]
                 local pz = mYX*x + mYY*y + mYZ*z + mYW
@@ -153,5 +153,5 @@ function ProcessPureModule(zBC, singleGroup, multiGroup, zBuffer, zSorter,
             ::disabled::
         end
     end
-    return zBC, dU
+    return zBC
 end

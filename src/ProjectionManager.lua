@@ -7,11 +7,9 @@ function Projector()
 
     -- Localize frequently accessed functions
     --- System-based function calls
-    local getWidth, getHeight, getFov, print, getTime =
+    local getWidth, getHeight, getTime =
     system.getScreenWidth,
     system.getScreenHeight,
-    system.getFov,
-    system.print,
     system.getArkTime
 
     --- Core-based function calls
@@ -39,7 +37,6 @@ function Projector()
     local tan, atan, rad = math.tan, math.atan, math.rad
 
     --- FOV Paramters
-    local vertFov = system.getCameraVerticalFov
     local horizontalFov = system.getCameraHorizontalFov
     local fnearDivAspect = 0
 
@@ -70,8 +67,6 @@ function Projector()
 
     function self.removeObjectGroup(objectGroup) objectGroups.Remove(objectGroup) end
     
-    local previousUI = nil
-    
     function self.getSVG()
         local getTime, atan, sort, format, concat = getTime, atan, table.sort, string.format, table.concat
         local startTime = getTime()
@@ -83,7 +78,7 @@ function Projector()
         end
         local isHolding = holding
 
-        local buffer,bufferCounter = {},0
+        local buffer = {}
 
         local width,height = getWidth(), getHeight()
         local aspect = width/height
@@ -120,12 +115,9 @@ function Projector()
         local objectGroupsArray,objectGroupSize = objectGroups.GetData()
         local svgBuffer,svgZBuffer,svgBufferCounter = {},{},0
 
-
-        local processedNumber = 0
         local processPure = ProcessPureModule
         local processUI = ProcessUIModule
         local processRots = ProcessOrientations
-        local renderUI = RenderUIElement
         local processEvents = ProcessActionEvents
         if processPure == nil then
             processPure = function(zBC) return zBC end
@@ -139,7 +131,6 @@ function Projector()
         local deltaPreProcessing = getTime() - startTime
         local deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing = 0,0,0,0,0
         for i = 1, objectGroupSize do
-            local drawProcessingStartTime = getTime()
             local objectGroup = objectGroupsArray[i]
             if objectGroup.enabled == false then
                 goto not_enabled
@@ -147,7 +138,7 @@ function Projector()
             local objects = objectGroup.objects
 
             local avgZ, avgZC = 0, 0
-            local zBuffer, zSorter, aBuffer, aSorter, aBC, zBC = {},{},{},{}, 0, 0
+            local zBuffer, zSorter, zBC = {},{}, 0
 
             local notIntersected = true
             for m = 1, #objects do
@@ -190,8 +181,12 @@ function Projector()
                 local uiGroups = obj[4]
                 
                 -- Process Actionables
+                local eventStartTime = getTime()
                 obj.previousUI = processEvents(uiGroups, obj.previousUI, isClicked, isHolding, mYX, mYY, mYZ, mYW, vYX,vYY,vYZ, processRotations, lx,ly,lz, sort)
+                local drawProcessingStartTime = getTime();
+                deltaEvent = deltaEvent + drawProcessingStartTime - eventStartTime
                 -- Progress Pure
+                
                 zBC = processPure(zBC, obj[2], obj[3], zBuffer, zSorter,
                     mXX, mXY, mXZ, mXW,
                     mYX, mYY, mYZ, mYW,
@@ -203,21 +198,13 @@ function Projector()
                     vZX,vZY,vZZ,
                     vXW,vYW,vZW,
                     processRotations,nearDivAspect)
-
+                deltaDrawProcessing = deltaDrawProcessing + getTime() - drawProcessingStartTime
                 ::is_nil::
             end
-            local eventStartTime = getTime()
-            deltaDrawProcessing = deltaDrawProcessing + eventStartTime - drawProcessingStartTime
-            if aBC > 0 then
-                sort(aSorter)
-                oldSelected, hovered = ProcessUIEvents(aBuffer, zBuffer, aBC, oldSelected, isClicked, isHolding)
-            end
             local zSortingStartTime = getTime()
-            deltaEvent = deltaEvent + zSortingStartTime - eventStartTime
             if objectGroup.isZSorting then
                 sort(zSorter)
             end
-            
             local zBufferCopyStartTime = getTime()
             deltaZSort = deltaZSort + zBufferCopyStartTime - zSortingStartTime
             local drawStringData = {}
