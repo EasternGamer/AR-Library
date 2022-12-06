@@ -85,7 +85,7 @@ function GetQuaternion(x,y,z,w)
         end
     elseif type(x) == 'table' then
         if #x == 3 then
-            return rotMatrixToQuat(x, y, z)
+            return RotMatrixToQuat(x, y, z)
         elseif #x == 4 then
             return x[1],x[2],x[3],x[4]
         else
@@ -160,7 +160,7 @@ function getRotationManager(out_rotation,wXYZ, name)
             dX,dY,dZ = pX,pY,pZ
         end
         if ww ~= 1 and ww ~= -1 then
-            wXYZ[1],wXYZ[2],wXYZ[3] = RotatePoint(wx,wy,wz,-ww,dX,dY,dZ,lTX,lTY,lTZ)
+            wXYZ[1],wXYZ[2],wXYZ[3] = rotatePoint(wx,wy,wz,-ww,dX,dY,dZ,lTX,lTY,lTZ)
             if iw ~= 1 then
                 wx,wy,wz,ww = multiply(wx,wy,wz,ww,ix,iy,iz,iw)
             end
