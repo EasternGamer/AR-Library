@@ -101,12 +101,11 @@ function QuaternionMultiply(ax,ay,az,aw,bx,by,bz,bw)
 end
 
 function RotatePoint(ax,ay,az,aw,oX,oY,oZ,wX,wY,wZ)
-    local t1,t2,t3 = 2*(ay*oZ - az*oY), 2*(az*oX - ax*oZ), 2*(ax*oY - ay*oX)
-    
+    local t1,t2,t3 = 2*(ax*oY - ay*oX),2*(ax*oZ - az*oX),2*(ay*oZ - az*oY)
     return 
-    oX + aw*t1 + ay*t3 - az*t2 + wX,
-    oY + (aw - ax)*t2 + az*t1 + wY,
-    oZ + aw*t3 + ax*t2 - ay*t1 + wZ
+    oX + ay*t1 + az*t2 + aw*t3 + wX,
+    oY - ax*t1 - aw*t2 + az*t3 + wY,
+    oZ + aw*t1 - ax*t2 - ay*t3 + wZ
 end
 function getRotationManager(out_rotation,wXYZ, name)
     --====================--

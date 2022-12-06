@@ -379,6 +379,7 @@ function LoadUIModule(self, uiGroups, objectRotation)
             end
 
             mRot.assignFunctions(elementData)
+            elementData.setPositionIsRelative(true)
             local function dataParityCheck(drawString)
                 local count = select(2, drawString:gsub("%%", ""))
                 local pointCount = (#elementData[7])*2
