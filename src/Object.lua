@@ -6,7 +6,7 @@ orientationTypes = {
     globalO=1,
     localO=2 
 }
-
+local print = DUSystem.print
 function ObjectGroup(objects, transX, transY)
     local objects=objects or {}
     local self={style='',gStyle='',class='default', objects=objects,transX=transX,transY=transY,enabled=true,glow=false,gRad=10,scale = false,isZSorting=true}
@@ -36,7 +36,7 @@ function Object(positionType, orientationType)
     local orientationType=orientationType
     local ori = {0,0,0,1}
     local position = {0,0,0}
-    local objRotationHandler = getRotationManager(ori,position)
+    local objRotationHandler = getRotationManager(ori,position, 'Object Rotation Handler')
     local defs = {}
     local self = {
         true, -- 1

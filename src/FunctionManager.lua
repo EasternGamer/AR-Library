@@ -4,34 +4,39 @@ function LinkedList(name, prefix)
     local internalTableSize = 0
     local removeKey,addKey,indexKey,refKey = prefix .. 'Remove',prefix .. 'Add',prefix..'index',prefix..'ref'
     
-    functions[prefix .. 'Remove'] = function (node)
+    functions[removeKey] = function (node)
         local tblSize,internalDataTable = internalTableSize,internalDataTable
         if tblSize > 1 then
-            local prefixIndex = indexKey
-            if node[prefixIndex] == -1 then return end
-            local lastElement,replaceNodeIndex = internalDataTable[tblSize],node[prefixIndex]
+            if node[indexKey] == -1 then return end
+            local lastElement,replaceNodeIndex = internalDataTable[tblSize],node[indexKey]
             internalDataTable[replaceNodeIndex] = lastElement
             internalDataTable[tblSize] = nil
-            lastElement[prefixIndex] = replaceNodeIndex
+            lastElement[indexKey] = replaceNodeIndex
             internalTableSize = tblSize - 1
-            node[prefixIndex] = -1
+            node[indexKey] = -1
+            node[refKey] = nil
         elseif tblSize == 1 then
-            internalDataTable[tblSize] = nil
+            internalDataTable[1] = nil
             internalTableSize = 0
             node[indexKey] = -1
+            node[refKey] = nil
         end
     end
 
-    functions[prefix .. 'Add'] = function (node)
-        local indexKey,ref = indexKey,refKey
+    functions[addKey] = function (node, override)
+        local indexKey,refKey = indexKey,refKey
         if node[indexKey] and node[indexKey] ~= -1 then
-            node[ref][removeKey](node)
-        else
-            node[ref] = functions
+            if not node[refKey] == functions or override then
+                node[refKey][removeKey](node)
+            else
+                return
+            end
         end
         local tblSize = internalTableSize + 1
+        
         internalDataTable[tblSize] = node
         node[indexKey] = tblSize
+        node[refKey] = functions
         internalTableSize = tblSize
     end
 
@@ -45,7 +50,7 @@ end
 local math = math
 local sin, cos, rad, type = math.sin,math.cos,math.rad, type
 
-function rotMatrixToQuat(m1,m2,m3)
+function RotMatrixToQuat(m1,m2,m3)
     local m11,m22,m33 = m1[1],m2[2],m3[3]
     local t=m11+m22+m33
     if t>0 then
@@ -63,7 +68,7 @@ function rotMatrixToQuat(m1,m2,m3)
     end
 end
 
-function getQuaternion(x,y,z,w)
+function GetQuaternion(x,y,z,w)
     if type(x) == 'number' then
         if w == nil then
             if x == x and y == y and z == z then
@@ -88,25 +93,26 @@ function getQuaternion(x,y,z,w)
         end
     end
 end
-function quaternionMultiply(ax,ay,az,aw,bx,by,bz,bw)
+function QuaternionMultiply(ax,ay,az,aw,bx,by,bz,bw)
     return ax*bw+aw*bx+ay*bz-az*by,
     ay*bw+aw*by+az*bx-ax*bz,
     az*bw+aw*bz+ax*by-ay*bx,
     aw*bw-ax*bx-ay*by-az*bz
 end
-function rotatePoint(ax,ay,az,aw,oX,oY,oZ,wX,wY,wZ)
-    local axax,ayay,azaz,axaz,away,awax,axay,ayaz,awaz=ax*ax,ay*ay,az*az,ax*az,aw*ay,aw*ax,ax*ay,ay*az,aw*az
-    return 
-    2*(oY*(axay-awaz)+oZ*(axaz+away)+oX*(0.5-ayay-azaz))+wX,
-    2*(oX*(awaz+axay)+oZ*(ayaz-awax)+oY*(0.5-axax-azaz))+wY,
-    2*(oX*(axaz-away)+oY*(awax+ayaz)+oZ*(0.5-axax-ayay))+wZ    
-end
 
-function getRotationManager(out_rotation,wXYZ)
+function RotatePoint(ax,ay,az,aw,oX,oY,oZ,wX,wY,wZ)
+    local t1,t2,t3 = 2*(ay*oZ - az*oY), 2*(az*oX - ax*oZ), 2*(ax*oY - ay*oX)
+    
+    return 
+    oX + aw*t1 + ay*t3 - az*t2 + wX,
+    oY + (aw - ax)*t2 + az*t1 + wY,
+    oZ + aw*t3 + ax*t2 - ay*t1 + wZ
+end
+function getRotationManager(out_rotation,wXYZ, name)
     --====================--
     --Local Math Functions--
     --====================--
-    local print,type,unpack,multiply,rotatePoint,getQuaternion = system.print,type,table.unpack,quaternionMultiply,rotatePoint,getQuaternion
+    local print,type,unpack,multiply,rotatePoint,getQuaternion = DUSystem.print,type,table.unpack,QuaternionMultiply,RotatePoint,GetQuaternion
 
     local superManager,needsUpdate,needNormal = nil,false,false
     local outBubble = nil
@@ -126,7 +132,7 @@ function getRotationManager(out_rotation,wXYZ)
     local nx,ny,nz = 0,1,0
 
     local subRotQueue = {}
-    local subRotations = LinkedList('', 'sub')
+    local subRotations = LinkedList(name, 'sub')
 
     --==============--
     --Function Array--
@@ -154,7 +160,7 @@ function getRotationManager(out_rotation,wXYZ)
             dX,dY,dZ = pX,pY,pZ
         end
         if ww ~= 1 and ww ~= -1 then
-            wXYZ[1],wXYZ[2],wXYZ[3] = rotatePoint(wx,wy,wz,-ww,dX,dY,dZ,lTX,lTY,lTZ)
+            wXYZ[1],wXYZ[2],wXYZ[3] = RotatePoint(wx,wy,wz,-ww,dX,dY,dZ,lTX,lTY,lTZ)
             if iw ~= 1 then
                 wx,wy,wz,ww = multiply(wx,wy,wz,ww,ix,iy,iz,iw)
             end
@@ -170,10 +176,7 @@ function getRotationManager(out_rotation,wXYZ)
         end
         local subRots,subRotsSize = subRotations.subGetData()
         for i=1, subRotsSize do
-            local sub = subRots[i]
-            if sub then
-                sub.update(wx,wy,wz,ww,pX,pY,pZ,wXYZ[1],wXYZ[2],wXYZ[3])
-            end
+            subRots[i].update(wx,wy,wz,ww,pX,pY,pZ,wXYZ[1],wXYZ[2],wXYZ[3])
         end
         needsUpdate = false
     end
@@ -216,8 +219,15 @@ function getRotationManager(out_rotation,wXYZ)
 
     function out.addSubRotation(rotManager)
         rotManager.setSuperManager(out)
-        subRotations.subAdd(rotManager)
+        subRotations.subAdd(rotManager, true)
         out.bubble()
+    end
+    function out.remove()
+        if superManager then
+            superManager.removeSubRotation(out)
+            out.setSuperManager(false)
+            out.bubble()
+        end
     end
     function out.removeSubRotation(sub)
         sub.setSuperManager(false)
@@ -251,6 +261,7 @@ function getRotationManager(out_rotation,wXYZ)
         inFuncArr.update = process
         function inFuncArr.getPosition() return pX,pY,pZ end
         function inFuncArr.getRotationManger() return out end
+        function inFuncArr.getSubRotationData() return subRotations.subGetData() end
         inFuncArr.checkUpdate = out.checkUpdate
         function inFuncArr.setPosition(tx,ty,tz)
             if not (tx ~= tx or ty ~= ty or tz ~= tz)  then

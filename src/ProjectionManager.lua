@@ -1,9 +1,9 @@
-function Projector(camera)
+function Projector()
     -- Localize frequently accessed data
-    local construct, player, system, math = construct, player, system, math
+    local construct, player, system, math = DUConstruct, DUPlayer, DUSystem, math
     
     -- Internal Parameters
-    local frameBuffer,frameRender,isSmooth = {''},true,true
+    local frameBuffer,frameCounter,isSmooth = {''},true,true
 
     -- Localize frequently accessed functions
     --- System-based function calls
@@ -30,7 +30,7 @@ function Projector(camera)
 
     --- Manager-based function calls
     ---- Quaternion operations
-    local rotMatrixToQuat,solveMat,quatMulti = rotMatrixToQuat,library.systemResolution3,quaternionMultiply
+    local rotMatrixToQuat,solveMat,quatMulti = RotMatrixToQuat,DULibrary.systemResolution3,QuaternionMultiply
     local function solve(mx,my,mz,mw,ix,iy,iz,iw)
         if ix then return quatMulti(mx,my,mz,mw,ix,iy,iz,iw) else return solveMat(mx,my,mz,mw) end
     end
@@ -75,7 +75,7 @@ function Projector(camera)
     function self.getSVG()
         local getTime, atan, sort, format, concat = getTime, atan, table.sort, string.format, table.concat
         local startTime = getTime()
-        frameCounter = not frameCounter
+        frameRender = not frameRender
         local isClicked = false
         if clicked then
             clicked = false
@@ -232,7 +232,7 @@ function Projector(camera)
                 local beginning, ending = '', ''
                 if isSmooth then
                     ending = '</div>'
-                    if frameCounter then
+                    if frameRender then
                         beginning = '<div class="second" style="visibility: hidden">'
                     else
                         beginning = '<style>.first{animation: f1 0.008s infinite linear;} .second{animation: f2 0.008s infinite linear;} @keyframes f1 {from {visibility: hidden;} to {visibility: hidden;}} @keyframes f2 {from {visibility: visible;} to { visibility: visible;}}</style><div class="first">'
@@ -289,7 +289,7 @@ function Projector(camera)
         for i = 1, svgBufferCounter do
             buffer[i] = svgBuffer[svgZBuffer[i]]
         end
-        if frameCounter then
+        if frameRender then
             frameBuffer[2] = concat(buffer)
             return concat(frameBuffer), deltaPreProcessing, deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing
         else
