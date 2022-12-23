@@ -1,10 +1,10 @@
 positionTypes = {
-    globalP=1,
-    localP=2
+    globalP=false,
+    localP=true
 }
 orientationTypes = {
-    globalO=1,
-    localO=2 
+    globalO=false,
+    localO=true 
 }
 local print = DUSystem.print
 function ObjectGroup(objects, transX, transY)
@@ -28,8 +28,11 @@ function ObjectGroup(objects, transX, transY)
     function self.setGlow(enable,radius,scale) self.glow = enable; self.gRad = radius or self.gRad; self.scale = scale or false end 
     return self
 end
-
-function Object(positionType, orientationType)
+ConstructReferential = getRotationManager({0,0,0,1},{0,0,0}, 'Construct')
+ConstructReferential.assignFunctions(ConstructReferential)
+ConstructOriReferential = getRotationManager({0,0,0,1},{0,0,0}, 'ConstructOri')
+ConstructOriReferential.assignFunctions(ConstructOriReferential)
+function Object(posType, oriType)
 
     local multiGroup,singleGroup,uiGroups={},{},{}
     local positionType=positionType
@@ -37,20 +40,20 @@ function Object(positionType, orientationType)
     local ori = {0,0,0,1}
     local position = {0,0,0}
     local objRotationHandler = getRotationManager(ori,position, 'Object Rotation Handler')
-    local defs = {}
+    
     local self = {
         true, -- 1
         multiGroup, -- 2
         singleGroup, -- 3
         uiGroups, -- 4
-        positionType, -- 5
-        orientationType, -- 6
-        ori, -- 7
-        position -- 8
+        ori, -- 5
+        position, -- 6
+        oriType, -- 7
+        posType -- 8
     }
-
     objRotationHandler.assignFunctions(self)
-
+    self.setPositionIsRelative(true)
+    self.setPositionIsRelative = nil
     function self.hide() self[1] = false end
     function self.show() self[1] = true end
 
@@ -67,12 +70,31 @@ function Object(positionType, orientationType)
 
     loadPureModule(self, multiGroup, singleGroup)
     loadUIModule(self, uiGroups, objRotationHandler)
-
+    local function choose()
+        objRotationHandler.remove()
+        local oriType,posType = self[7],self[8]
+        if oriType and posType then
+            ConstructReferential.addSubRotation(objRotationHandler)
+        elseif oriType then
+            ConstructOriReferential.addSubRotation(objRotationHandler)
+        end
+        self.setDoRotateOri(oriType)
+        self.setDoRotatePos(posType)
+    end
+    choose()
+    function self.setOrientationType(orientationType)
+        self[7] = orientationType
+        choose()
+    end
+    function self.setPositionType(positionType)
+        self[8] = positionType
+        choose()
+    end
+    
     function self.getRotationManager()
         return objRotationHandler
     end
     function self.addSubObject(object)
-        object.setPositionIsRelative(true)
         return objRotationHandler.addSubRotation(object.getRotationManager())
     end
     function self.removeSubObject(id)

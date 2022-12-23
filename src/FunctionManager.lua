@@ -85,7 +85,8 @@ function GetQuaternion(x,y,z,w)
         end
     elseif type(x) == 'table' then
         if #x == 3 then
-            return RotMatrixToQuat(x, y, z)
+            local x,y,z,w = RotMatrixToQuat(x, y, z)
+            return x,y,z,-w
         elseif #x == 4 then
             return x[1],x[2],x[3],x[4]
         else
@@ -107,19 +108,20 @@ function RotatePoint(ax,ay,az,aw,oX,oY,oZ,wX,wY,wZ)
     oY - ax*t1 - aw*t2 + az*t3 + wY,
     oZ + aw*t1 - ax*t2 - ay*t3 + wZ
 end
-function getRotationManager(out_rotation,wXYZ, name)
+function getRotationManager(out_rotation, wXYZ, name)
     --====================--
     --Local Math Functions--
     --====================--
     local print,type,unpack,multiply,rotatePoint,getQuaternion = DUSystem.print,type,table.unpack,QuaternionMultiply,RotatePoint,GetQuaternion
 
-    local superManager,needsUpdate,needNormal = nil,false,false
+    local superManager,needsUpdate,notForwarded,needNormal = nil,false,true,false
     local outBubble = nil
     --=================--
     --Positional Values--
     --=================--
     local pX,pY,pZ = wXYZ[1],wXYZ[2],wXYZ[3] -- These are original values, for relative to super rotation
-    local isRelativePosition = false
+    local positionIsRelative = false
+    local doRotateOri,doRotatePos = true,true
     local posY = math.random()*0.00001
 
     --==================--
@@ -141,7 +143,8 @@ function getRotationManager(out_rotation,wXYZ, name)
     --=======--
     --=Cache=--
     --=======--
-    local cache = {0,0,0,1,pX,pY,pZ,pX,pY,pZ}
+    local cache = {0,0,0,1,0,0,0,0,0,0}
+    
     --============================--
     --Primary Processing Functions--
     --============================--
@@ -151,33 +154,32 @@ function getRotationManager(out_rotation,wXYZ, name)
         else
             cache = {wx,wy,wz,ww,lX,lY,lZ,lTX,lTY,lTZ}
         end
-
-        local dX,dY,dZ
-        if not isRelativePosition then
-            dX,dY,dZ = pX - lX, pY - lY, pZ - lZ
-        else
-            dX,dY,dZ = pX,pY,pZ
+        local dx,dy,dz = pX,pY,pZ
+        if not positionIsRelative then
+            dx,dy,dz = dx - lX, dy - lY, dz - lZ
         end
-        if ww ~= 1 and ww ~= -1 then
-            wXYZ[1],wXYZ[2],wXYZ[3] = rotatePoint(wx,wy,wz,-ww,dX,dY,dZ,lTX,lTY,lTZ)
-            if iw ~= 1 then
-                wx,wy,wz,ww = multiply(wx,wy,wz,ww,ix,iy,iz,iw)
-            end
+        if doRotatePos then
+            wXYZ[1],wXYZ[2],wXYZ[3] = rotatePoint(wx,wy,wz,-ww,dx,dy,dz,lTX,lTY,lTZ)
         else
-            wXYZ[1],wXYZ[2],wXYZ[3] = lTX+dX,lTY+dY,lTZ+dZ
-            if iw ~= 1 then
-                wx,wy,wz,ww = ix,iy,iz,iw
-            end
+            wXYZ[1],wXYZ[2],wXYZ[3] = dx+lTX,dy+lTY,dz+lTZ
         end
+        if doRotateOri then
+            wx,wy,wz,ww = multiply(ix,iy,iz,iw,wx,wy,wz,ww)
+        else
+            wx,wy,wz,ww = ix,iy,iz,iw
+        end
+        
         out_rotation[1],out_rotation[2],out_rotation[3],out_rotation[4] = wx,wy,wz,ww
         if needNormal then
             nx,ny,nz = 2*(wx*wy+wz*ww),1-2*(wx*wx+wz*wz),2*(wy*wz-wx*ww)
         end
         local subRots,subRotsSize = subRotations.subGetData()
+       
         for i=1, subRotsSize do
             subRots[i].update(wx,wy,wz,ww,pX,pY,pZ,wXYZ[1],wXYZ[2],wXYZ[3])
         end
         needsUpdate = false
+        notForwarded = true
     end
     out.update = process
     local function validate()
@@ -206,7 +208,7 @@ function getRotationManager(out_rotation,wXYZ, name)
     function out.setSuperManager(rotManager)
         superManager = rotManager
         if not rotManager then
-            cache = {0,0,0,1,pX,pY,pZ,pX,pY,pZ}
+            cache = {0,0,0,1,0,0,0,0,0,0}
             needsUpdate = true
         end
     end
@@ -236,6 +238,7 @@ function getRotationManager(out_rotation,wXYZ, name)
         if superManager and not needsUpdate then
             subRotQueue = {}
             needsUpdate = true
+            notForwarded = false
             superManager.addToQueue(process)
         else
             needsUpdate = true
@@ -244,14 +247,16 @@ function getRotationManager(out_rotation,wXYZ, name)
 
     function out.checkUpdate()
         local neededUpdate = needsUpdate
-        if neededUpdate then
+        if neededUpdate and notForwarded then
             process()
             subRotQueue = {}
-        else
+        elseif notForwarded then
             for i=1, #subRotQueue do
                 subRotQueue[i]()
             end
             subRotQueue = {}
+        else
+            superManager.checkUpdate()
         end
         return neededUpdate
     end
@@ -263,6 +268,9 @@ function getRotationManager(out_rotation,wXYZ, name)
         function inFuncArr.getSubRotationData() return subRotations.subGetData() end
         inFuncArr.checkUpdate = out.checkUpdate
         function inFuncArr.setPosition(tx,ty,tz)
+            if type(tx) == 'table' then
+                tx,ty,tz = tx[1],tx[2],tx[3]
+            end
             if not (tx ~= tx or ty ~= ty or tz ~= tz)  then
                 local tmpY = ty+posY
                 if pX ~= tx or pY ~= tmpY or pZ ~= tz then
@@ -301,7 +309,10 @@ function getRotationManager(out_rotation,wXYZ, name)
         function inFuncArr.rotateY(rotY) tiy = rotY; tiw = nil; rotate(); if specialCall then specialCall() end end
         function inFuncArr.rotateZ(rotZ) tiz = rotZ; tiw = nil; rotate(); if specialCall then specialCall() end end
 
-        function inFuncArr.setPositionIsRelative(isRelative) isRelativePosition = isRelative; outBubble() end
+        function inFuncArr.setDoRotateOri(rot) doRotateOri = rot; outBubble() end
+        function inFuncArr.setDoRotatePos(rot) doRotatePos = rot; outBubble() end
+        
+        function inFuncArr.setPositionIsRelative(isRelative) positionIsRelative = isRelative; outBubble() end
         function inFuncArr.getRotation() return ix, iy, iz, iw end
     end
     out.assignFunctions = assignFunctions

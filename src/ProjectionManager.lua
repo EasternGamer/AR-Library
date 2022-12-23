@@ -3,7 +3,7 @@ function Projector()
     local construct, player, system, math = DUConstruct, DUPlayer, DUSystem, math
     
     -- Internal Parameters
-    local frameBuffer,frameCounter,isSmooth = {''},true,true
+    local frameBuffer,frameRender,isSmooth = {''},true,true
 
     -- Localize frequently accessed functions
     --- System-based function calls
@@ -12,26 +12,23 @@ function Projector()
     system.getScreenHeight,
     system.getArkTime
 
-    --- Core-based function calls
-    local getCWorldR, getCWorldF, getCWorldU, getCWorldPos =
+    --- Camera-based function calls
+    
+    local getCamWorldRight, getCamWorldFwd, getCamWorldUp, getCamWorldPos =
+    system.getCameraWorldRight,
+    system.getCameraWorldForward,
+    system.getCameraWorldUp,
+    system.getCameraWorldPos
+   
+    local getConWorldRight, getConWorldFwd, getConWorldUp, getConWorldPos = 
     construct.getWorldRight,
     construct.getWorldForward,
     construct.getWorldUp,
     construct.getWorldPosition
 
-    --- Camera-based function calls
-    local getCameraLocalPos = system.getCameraPos
-    local getCamLocalFwd, getCamLocalRight, getCamLocalUp =
-    system.getCameraForward,
-    system.getCameraRight,
-    system.getCameraUp
-
     --- Manager-based function calls
     ---- Quaternion operations
-    local rotMatrixToQuat,solveMat,quatMulti = RotMatrixToQuat,DULibrary.systemResolution3,QuaternionMultiply
-    local function solve(mx,my,mz,mw,ix,iy,iz,iw)
-        if ix then return quatMulti(mx,my,mz,mw,ix,iy,iz,iw) else return solveMat(mx,my,mz,mw) end
-    end
+    local rotMatrixToQuat,quatMulti = RotMatrixToQuat,QuaternionMultiply
     
     -- Localize Math functions
     local tan, atan, rad = math.tan, math.atan, math.rad
@@ -60,7 +57,7 @@ function Projector()
         end
         return pSize
     end
-
+    
     function self.setSmooth(iss) isSmooth = iss end
 
     function self.addObjectGroup(objectGroup) objectGroups.Add(objectGroup) end
@@ -68,7 +65,7 @@ function Projector()
     function self.removeObjectGroup(objectGroup) objectGroups.Remove(objectGroup) end
     
     function self.getSVG()
-        local getTime, atan, sort, format, concat = getTime, atan, table.sort, string.format, table.concat
+        local getTime, atan, sort, unpack, format, concat, quatMulti = getTime, atan, table.sort, table.unpack, string.format, table.concat, quatMulti
         local startTime = getTime()
         frameRender = not frameRender
         local isClicked = false
@@ -95,21 +92,8 @@ function Projector()
         local pxw,pzw = px1 * width * 0.5, -pz3 * height * 0.5
         
         --- View Matrix Processing
-        local vCX, vCY, vCZ, lEye =
-        getCamLocalRight(),
-        getCamLocalFwd(),
-        getCamLocalUp(),
-        getCameraLocalPos()
-        local lx,ly,lz = lEye[1],lEye[2],lEye[3]
-        local vx, vy, vz, vw = rotMatrixToQuat(vCX,vCY,vCZ)
-        local vW = solve(vCX,vCY,vCZ,lEye)
+         --- View Matrix Processing
         
-        -- View Matrix
-        local vXX,vXY,vXZ = vCX[1]*pxw,vCX[2]*pxw,vCX[3]*pxw
-        local vYX,vYY,vYZ = vCY[1], vCY[2], vCY[3]
-        local vZX,vZY,vZZ = vCZ[1]*pzw, vCZ[2]*pzw, vCZ[3]*pzw
-        local vXW,vYW,vZW = -vW[1]*pxw, -vW[2], -vW[3]*pzw
-
         
         -- Localize screen info
         local objectGroupsArray,objectGroupSize = objectGroups.GetData()
@@ -128,6 +112,20 @@ function Projector()
             processEvents = function() end
         end
         local predefinedRotations = {}
+        local camR,camF,camU,camP = getCamWorldRight(),getCamWorldFwd(),getCamWorldUp(),getCamWorldPos()
+        
+        do
+            local cwr,cwf,cwu = getConWorldRight(),getConWorldFwd(),getConWorldUp()
+            ConstructReferential.rotateXYZ(cwr,cwf,cwu)
+            ConstructOriReferential.rotateXYZ(cwr,cwf,cwu)
+            ConstructReferential.setPosition(getConWorldPos())
+            ConstructReferential.checkUpdate()
+            ConstructOriReferential.checkUpdate()
+        end
+        local vx,vy,vz,vw = rotMatrixToQuat(camR,camF,camU)
+        
+        local vxx,vxy,vxz,vyx,vyy,vyz,vzx,vzy,vzz = camR[1]*pxw,camR[2]*pxw,camR[3]*pxw,camF[1],camF[2],camF[3],camU[1]*pzw,camU[2]*pzw,camU[3]*pzw
+        local ex,ey,ez = camP[1],camP[2],camP[3]
         local deltaPreProcessing = getTime() - startTime
         local deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing = 0,0,0,0,0
         for i = 1, objectGroupSize do
@@ -148,56 +146,48 @@ function Projector()
                 end
 
                 obj.checkUpdate()
-                local objOri,objPos = obj[7],obj[8]
-                local mx, my, mz, mw = objOri[1], objOri[2], objOri[3], objOri[4]
-                local mW = solve(vCX, vCY, vCZ, objPos)
-                local vMX, vMY, vMZ, vMW = solve(mx,my,mz,mw, vx,vy,vz,vw)
+                local objOri, objPos, oriType, posType  = obj[5], obj[6], obj[7], obj[8]
+                local objX,objY,objZ = objPos[1]-ex,objPos[2]-ey,objPos[3]-ez
+                local mx,my,mz,mw = objOri[1], objOri[2], objOri[3], objOri[4]
+                
+                local a,b,c,d = quatMulti(mx,my,mz,mw,vx,vy,vz,vw)
+                local aa, ab, ac, ad, bb, bc, bd, cc, cd = 2*a*a, 2*a*b, 2*a*c, 2*a*d, 2*b*b, 2*b*c, 2*b*d, 2*c*c, 2*c*d
+                
+                local mXX, mXY, mXZ,
+                      mYX, mYY, mYZ,
+                      mZX, mZY, mZZ = 
+                (1 - bb - cc)*pxw,    (ab + cd)*pxw,    (ac - bd)*pxw,
+                (ab - cd),           (1 - aa - cc),     (bc + ad),
+                (ac + bd)*pzw,        (bc - ad)*pzw,    (1 - aa - bb)*pzw
+                
+                local mWX,mWY,mWZ = ((vxx*objX+vxy*objY+vxz*objZ)),(vyx*objX+vyy*objY+vyz*objZ),((vzx*objX+vzy*objY+vzz*objZ))
 
                 local processRotations = processRots(predefinedRotations,vx,vy,vz,vw,pxw,pzw)
-                local vMXvMX, vMXvMY, vMXvMZ, vMXvMW, vMYvMY, vMYvMZ, vMYvMW, vMZvMZ, vMZvMW = 2*vMX*vMX, 2*vMX*vMY, 2*vMX*vMZ, 2*vMX*vMW, 2*vMY*vMY, 2*vMY*vMZ, 2*vMY*vMW, 2*vMZ*vMZ, 2*vMZ*vMW
-
-                local mXX, mXY, mXZ, mXW =
-                (1 - vMYvMY - vMZvMZ)*pxw,
-                (vMXvMY + vMZvMW)*pxw,
-                (vMXvMZ - vMYvMW)*pxw,
-                mW[1]*pxw + vXW
-
-                local mYX, mYY, mYZ, mYW =
-                (vMXvMY - vMZvMW),
-                (1 - vMXvMX - vMZvMZ),
-                (vMYvMZ + vMXvMW),
-                mW[2] + vYW
-
-                local mZX, mZY, mZZ, mZW =
-                (vMXvMZ + vMYvMW)*pzw,
-                (vMYvMZ - vMXvMW)*pzw,
-                (1 - vMXvMX - vMYvMY)*pzw,
-                mW[3]*pzw + vZW
-
-
                 predefinedRotations[mx .. ',' .. my .. ',' .. mz .. ',' .. mw] = {mXX,mXZ,mYX,mYZ,mZX,mZZ}
-
-                avgZ = avgZ + mYW
+                
+                avgZ = avgZ + mWY
                 local uiGroups = obj[4]
                 
                 -- Process Actionables
                 local eventStartTime = getTime()
-                obj.previousUI = processEvents(uiGroups, obj.previousUI, isClicked, isHolding, mYX, mYY, mYZ, mYW, vYX,vYY,vYZ, processRotations, lx,ly,lz, sort)
-                local drawProcessingStartTime = getTime();
+                --obj.previousUI = processEvents(uiGroups, obj.previousUI, isClicked, isHolding, mYW, mYX, mYY, mYZ, vyx,vyy,vyz, processRotations, ex,ey,ez, sort)
+                local drawProcessingStartTime = getTime()
                 deltaEvent = deltaEvent + drawProcessingStartTime - eventStartTime
                 -- Progress Pure
-                
+       
                 zBC = processPure(zBC, obj[2], obj[3], zBuffer, zSorter,
-                    mXX, mXY, mXZ, mXW,
-                    mYX, mYY, mYZ, mYW,
-                    mZX, mZY, mZZ, mZW)
+                    mXX, mXY, mXZ,
+                    mYX, mYY, mYZ,
+                    mZX, mZY, mZZ,
+                    mWX, mWY, mWZ
+                )
                 -- Process UI
                 zBC = processUI(zBC, uiGroups, zBuffer, zSorter,
-                    vXX,vXY,vXZ,
-                    vYX,vYY,vYZ,
-                    vZX,vZY,vZZ,
-                    vXW,vYW,vZW,
-                    processRotations,nearDivAspect)
+                            vxx, vxy, vxz,
+                            vyx, vyy, vyz,
+                            vzx, vzy, vzz,
+                            ex,ey,ez,
+                        processRotations,nearDivAspect)
                 deltaDrawProcessing = deltaDrawProcessing + getTime() - drawProcessingStartTime
                 ::is_nil::
             end

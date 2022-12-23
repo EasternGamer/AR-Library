@@ -275,7 +275,6 @@ function LoadUIModule(self, uiGroups, objectRotation)
             local resultantPos = {x,y,z}
             local mRot = getRotationManager(mainRotation,resultantPos, 'Element')
             objectRotation.addSubRotation(mRot)
-
             local elementData = {
                 false,
                 false,
@@ -933,17 +932,15 @@ function ProcessOrientations(predefinedRotations,vMX,vMY,vMZ,vMW,pxw,pzw)
         end
         do
             local vMX,vMY,vMZ,vMW,pxw,pzw = vMX,vMY,vMZ,vMW,pxw,pzw
-            local rx, ry, rz, rw =
+            local a, b, c, d =
             fx*vMW + fw*vMX + fy*vMZ - fz*vMY,
             fy*vMW + fw*vMY + fz*vMX - fx*vMZ,
             fz*vMW + fw*vMZ + fx*vMY - fy*vMX,
             fw*vMW - fx*vMX - fy*vMY - fz*vMZ
-
-            local ryry, rxrz, ryrw = ry*ry, rx*rz,ry*rw
             pMR = {
-                2*(0.5 - ryry - rz*rz)*pxw, 2*(rxrz - ryrw)*pxw,
-                2*(rx*ry - rz*rw), 2*(ry*rz + rx*rw),
-                2*(rxrz + ryrw)*pzw, 2*(0.5 - rx*rx - ryry)*pzw
+                2*(0.5 - b*b - c*c)*pxw, 2*(a*c - b*d)*pxw,
+                2*(a*b - c*d), 2*(b*c + a*d),
+                2*(a*c + b*d)*pzw, 2*(0.5 - a*a - b*b)*pzw
             }
             predefinedRotations[key] = pMR
         end
@@ -951,28 +948,32 @@ function ProcessOrientations(predefinedRotations,vMX,vMY,vMZ,vMW,pxw,pzw)
         return pMR
     end
 end
+
 function ProcessUIModule(zBC, uiGroups, zBuffer, zSorter,
                 vXX,vXY,vXZ,
                 vYX,vYY,vYZ,
                 vZX,vZY,vZZ,
-                vXW,vYW,vZW,
+                eyeX,eyeY,eyeZ,
                 proc,nearDivAspect)
+    
+    
+    local unpack = unpack
     local move = table.move
     for i=1, #uiGroups do
         local elGroup = uiGroups[i]
         local elements,size = elGroup[1].drawGetData()
         for i=1,size do
             local el = elements[i]
+            el.checkUpdate()
             local eO = el[9]
-            local eXO, eYO, eZO = eO[1], eO[2], eO[3]
-
-            local ywAdd = vYX*eXO + vYY*eYO + vYZ*eZO + vYW
+            local eXO, eYO, eZO = eO[1]-eyeX, eO[2]-eyeY, eO[3]-eyeZ
+            local ywAdd = vYX*eXO + vYY*eYO + vYZ*eZO
             if ywAdd < 0 then
                 goto behindElement
             end
             local unpackData = {}
             local uC = 1
-            local xwAdd,zwAdd = vXX*eXO + vXY*eYO + vXZ*eZO + vXW,vZX*eXO + vZY*eYO + vZZ*eZO + vZW
+            local xwAdd,zwAdd = vXX*eXO + vXY*eYO + vXZ*eZO,vZX*eXO + vZY*eYO + vZZ*eZO
             local xxMult,xzMult,yxMult,yzMult,zxMult,zzMult = unpack(proc(el))
             local scale,drawData,pointsX,pointsY = el[5],el[6],el[7],el[8]
             local sizes = drawData.sizes
@@ -1007,13 +1008,14 @@ function ProcessUIModule(zBC, uiGroups, zBuffer, zSorter,
     return zBC
 end
 
-function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, mYY, mYZ, mYW, vx,vy,vz, proc, P0XD,P0YD,P0ZD, sort)
+function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYW, mYX,mYY,mYZ, vX,vY,vZ, proc, P0XD,P0YD,P0ZD, sort)
     local aBuffer,aSorter,aBC = {},{},0
     for i=1, #uiGroups do
         local elGroup = uiGroups[i]
         local elements,size = elGroup[2].actionGetData()
         for m=1,size do
             local el = elements[m]
+            el.checkUpdate()
             local eO = el[9]
             local eX, eY, eZ = eO[1], eO[2], eO[3]
 
@@ -1026,12 +1028,12 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYX, m
             local p0X, p0Y, p0Z = P0XD - eX, P0YD - eY, P0ZD - eZ
 
             local NX, NY, NZ = el.getNormal()
-            local t = -(p0X*NX + p0Y*NY + p0Z*NZ)/(vx*NX + vy*NY + vz*NZ)
+            local t = -(p0X*NX + p0Y*NY + p0Z*NZ)/(vX*NX + vY*NY + vZ*NZ)
 
             local function Process()
                 local el = el
                 local pMR,t = proc(el),t
-                local px, py, pz = p0X + t*vx, p0Y + t*vy, p0Z + t*vz
+                local px, py, pz = p0X + t*vX, p0Y + t*vY, p0Z + t*vZ
                 local gx,gy,gz = px + eX, py + eY, pz + eZ
                 if not pMR[7] then
                     local oRM = el[11]

@@ -109,9 +109,10 @@ function LoadPureModule(self, singleGroup, multiGroup)
 end
 
 function ProcessPureModule(zBC, singleGroup, multiGroup, zBuffer, zSorter,
-        mXX, mXY, mXZ, mXW,
-        mYX, mYY, mYZ, mYW,
-        mZX, mZY, mZZ, mZW)
+        mXX, mXY, mXZ,
+        mYX, mYY, mYZ,
+        mZX, mZY, mZZ,
+        mXW, mYW, mZW)
     for cG = 1, #singleGroup do
         local group = singleGroup[cG]
         local singleGroups,singleSize = group.GetData()
