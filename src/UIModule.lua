@@ -1008,7 +1008,7 @@ function ProcessUIModule(zBC, uiGroups, zBuffer, zSorter,
     return zBC
 end
 
-function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYW, mYX,mYY,mYZ, vX,vY,vZ, proc, P0XD,P0YD,P0ZD, sort)
+function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, vX,vY,vZ, proc, eyeX, eyeY, eyeZ, sort)
     local aBuffer,aSorter,aBC = {},{},0
     for i=1, #uiGroups do
         local elGroup = uiGroups[i]
@@ -1017,24 +1017,19 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYW, m
             local el = elements[m]
             el.checkUpdate()
             local eO = el[9]
-            local eX, eY, eZ = eO[1], eO[2], eO[3]
-
-            local eCZ = mYX*eX + mYY*eY + mYZ*eZ + mYW
-            if eCZ < 0 then
+            local eX, eY, eZ = eO[1]-eyeX, eO[2]-eyeY, eO[3]-eyeZ
+            local NX, NY, NZ = el.getNormal()
+            
+            local t = (eX*NX + eY*NY + eZ*NZ)/(vX*NX + vY*NY + vZ*NZ)
+            if t < 0 then
                 goto behindElement
             end
-
             aBC = aBC + 1
-            local p0X, p0Y, p0Z = P0XD - eX, P0YD - eY, P0ZD - eZ
-
-            local NX, NY, NZ = el.getNormal()
-            local t = -(p0X*NX + p0Y*NY + p0Z*NZ)/(vX*NX + vY*NY + vZ*NZ)
-
+            
             local function Process()
                 local el = el
                 local pMR,t = proc(el),t
-                local px, py, pz = p0X + t*vX, p0Y + t*vY, p0Z + t*vZ
-                local gx,gy,gz = px + eX, py + eY, pz + eZ
+                local px, py, pz = t*vX - eX, t*vY - eY, t*vZ - eZ
                 if not pMR[7] then
                     local oRM = el[11]
                     local fx,fy,fz,fw = oRM[1],oRM[2],oRM[3],oRM[4]
@@ -1051,6 +1046,7 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYW, m
                 local inside = false
 
                 local pX, pZ = pMR[7]*px + pMR[8]*py + pMR[9]*pz, pMR[10]*px + pMR[11]*py + pMR[12]*pz
+
                 if type(eBounds) == "function" then
                    inside = eBounds(pX, pZ, t)
                 else
@@ -1095,27 +1091,27 @@ function ProcessActionEvents(uiGroups, oldSelected, isClicked, isHolding, mYW, m
                 if not oldSelected then
                     local enter = actions[3]
                     if enter then
-                        enter(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
+                        enter(el, pX, pZ, eX, eY, eZ)
                     end
                     el[12] = hoverDraw
                 elseif el == oldSelected[1] then
                     if isClicked then
                         local clickAction = actions[1]
                         if clickAction then
-                            clickAction(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
+                            clickAction(el, pX, pZ, eX, eY, eZ, px, py, pz)
                             isClicked = false
                         end
                         el[12] = clickDraw
                     elseif isHolding then
                         local holdAction = actions[2]
                         if holdAction then
-                            holdAction(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
+                            holdAction(el, pX, pZ, eX, eY, eZ, px, py, pz)
                         end
                         el[12] = clickDraw
                     else
                         local hoverAction = actions[5]
                         if hoverAction then
-                            hoverAction(el, pX, pZ, eX, eY, eZ, gx, gy, gz)
+                            hoverAction(el, pX, pZ, eX, eY, eZ, px, py, pz)
                         end
                         el[12] = hoverDraw
                     end

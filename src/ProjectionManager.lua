@@ -170,7 +170,7 @@ function Projector()
                 
                 -- Process Actionables
                 local eventStartTime = getTime()
-                --obj.previousUI = processEvents(uiGroups, obj.previousUI, isClicked, isHolding, mYW, mYX, mYY, mYZ, vyx,vyy,vyz, processRotations, ex,ey,ez, sort)
+                obj.previousUI = processEvents(uiGroups, obj.previousUI, isClicked, isHolding, vyx, vyy, vyz, processRotations, ex,ey,ez, sort)
                 local drawProcessingStartTime = getTime()
                 deltaEvent = deltaEvent + drawProcessingStartTime - eventStartTime
                 -- Progress Pure
