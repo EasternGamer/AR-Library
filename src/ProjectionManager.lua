@@ -3,14 +3,15 @@ function Projector()
     local construct, player, system, math = DUConstruct, DUPlayer, DUSystem, math
     
     -- Internal Parameters
-    local frameBuffer,frameRender,isSmooth = {''},true,true
+    local frameBuffer,frameRender,isSmooth,lowLatency = {'',''},true,true,true
 
     -- Localize frequently accessed functions
     --- System-based function calls
-    local getWidth, getHeight, getTime =
+    local getWidth, getHeight, getTime, setScreen =
     system.getScreenWidth,
     system.getScreenHeight,
-    system.getArkTime
+    system.getArkTime,
+    system.setScreen
 
     --- Camera-based function calls
     
@@ -40,7 +41,7 @@ function Projector()
     local objectGroups = LinkedList('Group', '')
 
     local self = {}
-  
+
     function self.getSize(size, zDepth, max, min)
         local pSize = atan(size, zDepth) * fnearDivAspect
         if max then
@@ -58,7 +59,11 @@ function Projector()
         return pSize
     end
     
-    function self.setSmooth(iss) isSmooth = iss end
+    function self.refresh() frameRender = not frameRender; end
+    
+    function self.setLowLatency(low) lowLatency = low; frameRender = not frameRender; end
+    
+    function self.setSmooth(iss) isSmooth = iss; frameRender = not frameRender; end
 
     function self.addObjectGroup(objectGroup) objectGroups.Add(objectGroup) end
 
@@ -266,12 +271,16 @@ function Projector()
         for i = 1, svgBufferCounter do
             buffer[i] = svgBuffer[svgZBuffer[i]]
         end
+        
         if frameRender then
             frameBuffer[2] = concat(buffer)
             return concat(frameBuffer), deltaPreProcessing, deltaDrawProcessing, deltaEvent, deltaZSort, deltaZBufferCopy, deltaPostProcessing
         else
             if isSmooth then
                 frameBuffer[1] = concat(buffer)
+                if lowLatency then
+                    setScreen('<div>Refresh Required</div>') -- magical things happen when doing this for some reason, some really, really weird reason.
+                end
             else
                 frameBuffer[1] = ''
             end
