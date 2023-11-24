@@ -923,28 +923,23 @@ function LoadUIModule(self, uiGroups, objectRotation)
 end
 function ProcessOrientations(predefinedRotations,vMX,vMY,vMZ,vMW,pxw,pzw)
     return function (el)
-        local oRM = el[11]
-        local fx, fy, fz, fw = oRM[1], oRM[2], oRM[3], oRM[4]
-        local key = fx .. ',' .. fy .. ',' .. fz .. ',' .. fw
-        local pMR = predefinedRotations[key]
+        local key = el[11]
+        local pMR = predefinedRotations[key[5]]
         if pMR then
-            goto skip
+            return pMR
         end
-        do
-            local vMX,vMY,vMZ,vMW,pxw,pzw = vMX,vMY,vMZ,vMW,pxw,pzw
-            local a, b, c, d =
-            fx*vMW + fw*vMX + fy*vMZ - fz*vMY,
-            fy*vMW + fw*vMY + fz*vMX - fx*vMZ,
-            fz*vMW + fw*vMZ + fx*vMY - fy*vMX,
-            fw*vMW - fx*vMX - fy*vMY - fz*vMZ
-            pMR = {
-                2*(0.5 - b*b - c*c)*pxw, 2*(a*c - b*d)*pxw,
-                2*(a*b - c*d), 2*(b*c + a*d),
-                2*(a*c + b*d)*pzw, 2*(0.5 - a*a - b*b)*pzw
-            }
-            predefinedRotations[key] = pMR
-        end
-        ::skip::
+        local fx, fy, fz, fw = key[1], key[2], key[3], key[4]
+        local a, b, c, d =
+        fx*vMW + fw*vMX + fy*vMZ - fz*vMY,
+        fy*vMW + fw*vMY + fz*vMX - fx*vMZ,
+        fz*vMW + fw*vMZ + fx*vMY - fy*vMX,
+        fw*vMW - fx*vMX - fy*vMY - fz*vMZ
+        pMR = {
+            2*(0.5 - b*b - c*c)*pxw, 2*(a*c - b*d)*pxw,
+            2*(a*b - c*d), 2*(b*c + a*d),
+            2*(a*c + b*d)*pzw, 2*(0.5 - a*a - b*b)*pzw
+        }
+        predefinedRotations[key[5]] = pMR
         return pMR
     end
 end

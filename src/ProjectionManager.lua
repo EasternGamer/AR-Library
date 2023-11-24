@@ -61,9 +61,9 @@ function Projector()
     
     function self.refresh() frameRender = not frameRender; end
     
-    function self.setLowLatency(low) lowLatency = low; frameRender = not frameRender; end
+    function self.setLowLatency(low) lowLatency = low; end
     
-    function self.setSmooth(iss) isSmooth = iss; frameRender = not frameRender; end
+    function self.setSmooth(iss) isSmooth = iss; end
 
     function self.addObjectGroup(objectGroup) objectGroups.Add(objectGroup) end
 
