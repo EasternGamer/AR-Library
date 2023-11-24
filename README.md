@@ -1,3 +1,9 @@
+# WARNING! This readme is terribly outdated. I don't have time to update this anymore, proceed with caution.
+Note, if you wish to learn this API, you can send me a message on Discord, username easterngamer/EasternGamer. You can also use the examples presented here (waypointer and the sample in unit filters)
+
+The System Filters are essential and need to go into their respective filters for full functionality.
+The rest should go in Library as individual onStart() filters.
+
 # Augmented Reality API
 
 Hello there, I will warn you in advance, this is **not** for your average user. This is for other script developers to implement in their own scripts.
